@@ -1,13 +1,16 @@
 import 'package:equatable/equatable.dart';
 
 enum SyncQueueStatus {
+  
   pending,
   processing,
   completed,
   failed,
+  
 }
 
 class SyncQueueItem extends Equatable {
+  
   final int? id;
   final String feature;
   final String endpoint;
@@ -22,6 +25,7 @@ class SyncQueueItem extends Equatable {
   final DateTime createdAt;
   final String? errorMessage;
 
+  
   const SyncQueueItem({
     this.id,
     required this.feature,
