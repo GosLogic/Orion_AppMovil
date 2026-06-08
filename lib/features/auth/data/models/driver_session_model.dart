@@ -8,6 +8,7 @@ class DriverSessionModel extends DriverSession {
     required super.expiresAt,
   });
 
+
   factory DriverSessionModel.fromJson(Map<String, dynamic> json) {
     return DriverSessionModel(
       driverId: json['driver_id'] as String,
