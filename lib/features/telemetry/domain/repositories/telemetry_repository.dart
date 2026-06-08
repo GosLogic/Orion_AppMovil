@@ -3,6 +3,6 @@ import 'package:orion_app/features/telemetry/domain/entities/vehicle_position.da
 
 abstract class TelemetryRepository {
   Future<Result<void>> insertPosition(VehiclePosition position);
-
+                                  
   Future<Result<List<VehiclePosition>>> getUnsyncedPositions({int limit = 100});
 }
