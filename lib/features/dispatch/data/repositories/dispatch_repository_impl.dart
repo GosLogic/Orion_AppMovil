@@ -1,13 +1,16 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:orion_app/core/constants/api_constants.dart';
 import 'package:orion_app/core/error/failures.dart';
 import 'package:orion_app/core/sync/sync_manager.dart';
 import 'package:orion_app/core/utils/result.dart';
 import 'package:orion_app/features/dispatch/data/datasources/dispatch_local_datasource.dart';
+import 'package:orion_app/features/dispatch/data/datasources/dispatch_remote_datasource.dart';
 import 'package:orion_app/features/dispatch/data/models/delivery_model.dart';
 import 'package:orion_app/features/dispatch/data/models/route_sheet_model.dart';
 import 'package:orion_app/features/dispatch/data/models/trip_stop_model.dart';
+import 'package:orion_app/features/dispatch/data/utils/dispatch_error_mapper.dart';
 import 'package:orion_app/features/dispatch/domain/entities/delivery.dart';
-import 'package:orion_app/features/dispatch/domain/entities/proof_of_delivery.dart';
 import 'package:orion_app/features/dispatch/domain/entities/route_sheet.dart';
 import 'package:orion_app/features/dispatch/domain/entities/trip_stop.dart';
 import 'package:orion_app/features/dispatch/domain/repositories/dispatch_repository.dart';
@@ -15,21 +18,140 @@ import 'package:orion_app/features/dispatch/domain/repositories/dispatch_reposit
 class DispatchRepositoryImpl implements DispatchRepository {
   DispatchRepositoryImpl({
     required DispatchLocalDataSource localDataSource,
+    required DispatchRemoteDataSource remoteDataSource,
     required SyncManager syncManager,
   })  : _localDataSource = localDataSource,
+        _remoteDataSource = remoteDataSource,
         _syncManager = syncManager;
 
   final DispatchLocalDataSource _localDataSource;
+  final DispatchRemoteDataSource _remoteDataSource;
   final SyncManager _syncManager;
 
   @override
-  Future<Result<RouteSheet?>> getDailyRoute() async {
+  Future<Result<List<RouteSheet>>> getRouteSheets() async {
     try {
-      final sheet = await _localDataSource.getDailyRouteSheet();
-      return Success(sheet?.toEntity());
+      final remoteSheets = await _remoteDataSource.fetchRouteSheets();
+      return Success(remoteSheets.map((s) => s.toEntity()).toList());
+    } on DioException catch (e) {
+      return Error(NetworkFailure(mapDispatchError(e)));
+    } catch (e) {
+      return Error(NetworkFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<RouteSheet>> loadRouteSheet(String routeSheetId) async {
+    try {
+      final remoteSheets = await _remoteDataSource.fetchRouteSheets();
+
+      RouteSheetModel? target;
+      for (final s in remoteSheets) {
+        if (s.id == routeSheetId) {
+          target = s;
+          break;
+        }
+      }
+
+      if (target == null) {
+        return const Error(CacheFailure('Hoja de ruta no encontrada'));
+      }
+
+      await _syncSheetToLocal(target);
+      return Success(target.toEntity());
+    } on DioException catch (e) {
+      return Error(NetworkFailure(mapDispatchError(e)));
     } catch (e) {
       return Error(CacheFailure(e.toString()));
     }
+  }
+
+  Future<void> _syncSheetToLocal(RouteSheetModel sheet) async {
+    await _localDataSource.clearRouteAndStops();
+    await _localDataSource.saveRouteSheet(sheet);
+
+    List<TripStopModel> stops;
+    try {
+      stops = await _remoteDataSource.fetchTripStops(sheet.id);
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Dispatch] Paradas no cargadas: ${mapDispatchError(e)}');
+      }
+      stops = const [];
+    }
+
+    for (final stop in stops) {
+      await _localDataSource.saveTripStop(stop);
+      final existing = await _localDataSource.getDeliveries(stop.id);
+      if (existing.isEmpty) {
+        await _seedDefaultDelivery(stop);
+      }
+    }
+  }
+
+  /// GET remoto → cache local. [RouteSheet.status] = jornada; [TripStop.status] = parada.
+  @override
+  Future<Result<RouteSheet?>> getDailyRoute() async {
+    try {
+      final remoteSheets = await _remoteDataSource.fetchRouteSheets();
+
+      if (remoteSheets.isEmpty) {
+        await _localDataSource.clearDispatchData();
+        return const Success(null);
+      }
+
+      final sheet = _pickDailySheet(remoteSheets);
+      await _syncSheetToLocal(sheet);
+
+      return Success(sheet.toEntity());
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Dispatch] Error remoto, intentando cache local: ${mapDispatchError(e)}',
+        );
+      }
+      return _getDailyRouteFromCache(fallbackError: mapDispatchError(e));
+    } catch (e) {
+      return _getDailyRouteFromCache(fallbackError: e.toString());
+    }
+  }
+
+  Future<Result<RouteSheet?>> _getDailyRouteFromCache({String? fallbackError}) async {
+    try {
+      final sheet = await _localDataSource.getDailyRouteSheet();
+      if (sheet != null) {
+        return Success(sheet.toEntity());
+      }
+      return Error(
+        NetworkFailure(
+          fallbackError ?? 'No se pudo cargar la ruta desde el servidor',
+        ),
+      );
+    } catch (e) {
+      return Error(CacheFailure(e.toString()));
+    }
+  }
+
+  RouteSheetModel _pickDailySheet(List<RouteSheetModel> sheets) {
+    final today = DateTime.now();
+    final todaySheets = sheets.where((s) {
+      return s.scheduledDate.year == today.year &&
+          s.scheduledDate.month == today.month &&
+          s.scheduledDate.day == today.day;
+    }).toList();
+    return todaySheets.isNotEmpty ? todaySheets.first : sheets.first;
+  }
+
+  /// Sin GET /deliveries en backend; IDs alineados al seeder (del-stop-001-1, …).
+  Future<void> _seedDefaultDelivery(TripStopModel stop) async {
+    await _localDataSource.saveDelivery(
+      DeliveryModel(
+        id: 'del-${stop.id}-1',
+        tripStopId: stop.id,
+        customerName: 'Cliente ${stop.sequence}',
+        packageDescription: 'Paquete estándar #${stop.sequence}',
+      ),
+    );
   }
 
   @override
@@ -139,7 +261,6 @@ class DispatchRepositoryImpl implements DispatchRepository {
   @override
   Future<Result<Delivery>> submitProofOfDelivery({
     required String deliveryId,
-    required ProofOfDelivery proof,
   }) async {
     try {
       final route = await _localDataSource.getDailyRouteSheet();
@@ -165,9 +286,9 @@ class DispatchRepositoryImpl implements DispatchRepository {
         tripStopId: target.tripStopId,
         customerName: target.customerName,
         packageDescription: target.packageDescription,
-        proof: proof,
         deliveredAt: DateTime.now(),
         isCompleted: true,
+        synced: false,
       );
 
       await _localDataSource.saveDelivery(updated);
@@ -194,7 +315,7 @@ class DispatchRepositoryImpl implements DispatchRepository {
       await _syncManager.enqueue(
         feature: 'dispatch',
         endpoint: ApiConstants.deliveries,
-        payload: updated.toJson(),
+        payload: updated.toApiPayload(),
       );
 
       return Success(updated.toEntity());

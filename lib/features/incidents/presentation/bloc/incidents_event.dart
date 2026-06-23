@@ -41,3 +41,11 @@ class TriggerPanicAlert extends IncidentsEvent {
   @override
   List<Object?> get props => [latitude, longitude, stopId];
 }
+
+class LoadMaintenanceHistory extends IncidentsEvent {
+  const LoadMaintenanceHistory();
+}
+
+class SyncMaintenancePending extends IncidentsEvent {
+  const SyncMaintenancePending();
+}

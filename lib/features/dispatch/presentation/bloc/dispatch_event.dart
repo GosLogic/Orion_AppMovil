@@ -1,11 +1,23 @@
 import 'package:equatable/equatable.dart';
-import 'package:orion_app/features/dispatch/domain/entities/proof_of_delivery.dart';
 
 abstract class DispatchEvent extends Equatable {
   const DispatchEvent();
 
   @override
   List<Object?> get props => [];
+}
+
+class LoadRouteSheets extends DispatchEvent {
+  const LoadRouteSheets();
+}
+
+class LoadRouteSheet extends DispatchEvent {
+  final String routeSheetId;
+
+  const LoadRouteSheet(this.routeSheetId);
+
+  @override
+  List<Object?> get props => [routeSheetId];
 }
 
 class LoadDailyRoute extends DispatchEvent {
@@ -40,13 +52,9 @@ class LoadStopDeliveries extends DispatchEvent {
 
 class SubmitProofOfDelivery extends DispatchEvent {
   final String deliveryId;
-  final ProofOfDelivery proof;
 
-  const SubmitProofOfDelivery({
-    required this.deliveryId,
-    required this.proof,
-  });
+  const SubmitProofOfDelivery({required this.deliveryId});
 
   @override
-  List<Object?> get props => [deliveryId, proof];
+  List<Object?> get props => [deliveryId];
 }

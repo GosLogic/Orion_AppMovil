@@ -7,16 +7,17 @@ import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_bloc.dart
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_event.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_state.dart';
 import 'package:orion_app/features/dispatch/presentation/pages/stop_detail_page.dart';
-import 'package:orion_app/features/dispatch/presentation/widgets/panic_button.dart';
 import 'package:orion_app/features/dispatch/presentation/widgets/stop_card_widget.dart';
-import 'package:orion_app/features/telemetry/domain/utils/telemetry_id_parser.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_bloc.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_event.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_state.dart';
+import 'package:orion_app/features/incidents/presentation/pages/report_maintenance_page.dart';
 import 'package:orion_app/injection_container.dart';
 
 class RouteHomePage extends StatefulWidget {
-  const RouteHomePage({super.key});
+  final String routeSheetId;
+
+  const RouteHomePage({super.key, required this.routeSheetId});
 
   @override
   State<RouteHomePage> createState() => _RouteHomePageState();
@@ -26,7 +27,7 @@ class _RouteHomePageState extends State<RouteHomePage> {
   @override
   void initState() {
     super.initState();
-    context.read<DispatchBloc>().add(const LoadDailyRoute());
+    context.read<DispatchBloc>().add(LoadRouteSheet(widget.routeSheetId));
   }
 
   @override
@@ -35,28 +36,42 @@ class _RouteHomePageState extends State<RouteHomePage> {
       backgroundColor: const Color(0xFFECEFF1),
       appBar: AppBar(
         title: const Text(
-          'Mi Ruta - Orion',
+          'Hoja de Ruta',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
         ),
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
-        actions: const [
-          _SyncStatusIcon(),
-          _GpsStatusIcon(),
-          SizedBox(width: 8),
+        actions: [
+          const _GpsStatusChip(),
+          const _SyncStatusIcon(),
         ],
       ),
-      floatingActionButton: const DispatchPanicButton(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: MultiBlocListener(
         listeners: [
           BlocListener<DispatchBloc, DispatchState>(
-            listener: _handleDispatchMessages,
+            listenWhen: (prev, curr) =>
+                prev.dailyRoute?.status != curr.dailyRoute?.status,
+            listener: _syncTelemetryWithJornada,
           ),
           BlocListener<TelemetryBloc, TelemetryState>(
-            listener: _handleTelemetryMessages,
+            listenWhen: (prev, curr) =>
+                prev.warningMessage != curr.warningMessage &&
+                curr.warningMessage != null,
+            listener: (context, state) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.warningMessage!),
+                    backgroundColor: const Color(0xFFE65100),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+            },
           ),
         ],
+        child: BlocListener<DispatchBloc, DispatchState>(
+        listener: _handleDispatchMessages,
         child: BlocBuilder<DispatchBloc, DispatchState>(
           builder: (context, state) {
           if (state.status == DispatchStatus.loading &&
@@ -67,17 +82,38 @@ class _RouteHomePageState extends State<RouteHomePage> {
           }
 
           if (state.dailyRoute == null) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'No hay ruta asignada para hoy.\nLos horarios aparecerán aquí cuando se sincronicen.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF455A64),
-                  ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.route_outlined,
+                      size: 64,
+                      color: Color(0xFF455A64),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      state.infoMessage ??
+                          'No tienes una hoja de ruta asignada.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF455A64),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Desliza hacia abajo para actualizar.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF78909C),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -89,7 +125,9 @@ class _RouteHomePageState extends State<RouteHomePage> {
           return RefreshIndicator(
             color: const Color(0xFF1A237E),
             onRefresh: () async {
-              context.read<DispatchBloc>().add(const LoadDailyRoute());
+              context
+                  .read<DispatchBloc>()
+                  .add(LoadRouteSheet(widget.routeSheetId));
               await Future<void>.delayed(const Duration(milliseconds: 400));
             },
             child: CustomScrollView(
@@ -106,10 +144,24 @@ class _RouteHomePageState extends State<RouteHomePage> {
                         context.read<DispatchBloc>().add(const StartJornada()),
                     onEnd: () =>
                         context.read<DispatchBloc>().add(const EndJornada()),
+                    onMaintenance: () => _openMaintenanceReport(context, route),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      'Paradas (${state.tripStops.length})',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF263238),
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
@@ -130,8 +182,46 @@ class _RouteHomePageState extends State<RouteHomePage> {
           );
         },
         ),
+        ),
       ),
     );
+  }
+
+  void _syncTelemetryWithJornada(BuildContext context, DispatchState state) {
+    final route = state.dailyRoute;
+    if (route == null) return;
+
+    final telemetryBloc = context.read<TelemetryBloc>();
+
+    if (route.isJornadaActive) {
+      final vehicleId = route.telemetryVehicleId;
+      final routeSheetId = route.telemetryRouteSheetId;
+
+      if (vehicleId == null || routeSheetId == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No se pudo resolver vehicle_id/route_sheet_id desde la hoja '
+                'de ruta. Revisa que el backend envíe vehicle_id en la respuesta.',
+              ),
+              backgroundColor: Color(0xFFE65100),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        return;
+      }
+
+      telemetryBloc.add(
+        StartTelemetry(
+          vehicleId: vehicleId,
+          routeSheetId: routeSheetId,
+        ),
+      );
+    } else if (route.status == RouteSheetStatus.completed) {
+      telemetryBloc.add(const StopTelemetry());
+    }
   }
 
   void _handleDispatchMessages(BuildContext context, DispatchState state) {
@@ -148,20 +238,6 @@ class _RouteHomePageState extends State<RouteHomePage> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-
-      final route = state.dailyRoute;
-      if (route != null) {
-        if (state.successMessage!.contains('Jornada iniciada')) {
-          context.read<TelemetryBloc>().add(
-                StartTelemetry(
-                  vehicleId: parseOrionNumericId(route.vehicleId),
-                  routeSheetId: parseOrionNumericId(route.id),
-                ),
-              );
-        } else if (state.successMessage!.contains('Jornada finalizada')) {
-          context.read<TelemetryBloc>().add(const StopTelemetry());
-        }
-      }
     }
     if (state.errorMessage != null) {
       ScaffoldMessenger.of(context)
@@ -179,22 +255,22 @@ class _RouteHomePageState extends State<RouteHomePage> {
     }
   }
 
-  void _handleTelemetryMessages(BuildContext context, TelemetryState state) {
-    if (state.status == TelemetryStatus.gpsError &&
-        state.errorMessage != null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Error GPS: ${state.errorMessage}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: const Color(0xFFC62828),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+  void _openMaintenanceReport(BuildContext context, RouteSheet route) {
+    final vehicleId = route.vehicleId;
+    if (vehicleId == null || vehicleId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay vehículo asignado en esta hoja de ruta'),
+          backgroundColor: Color(0xFFC62828),
+        ),
+      );
+      return;
     }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportMaintenancePage(vehicleId: vehicleId),
+      ),
+    );
   }
 
   void _openStopDetail(BuildContext context, TripStop stop) {
@@ -202,6 +278,129 @@ class _RouteHomePageState extends State<RouteHomePage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => StopDetailPage(tripStop: stop),
+      ),
+    );
+  }
+}
+
+class _GpsStatusChip extends StatelessWidget {
+  const _GpsStatusChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TelemetryBloc, TelemetryState>(
+      builder: (context, state) {
+        final hasError = state.status == TelemetryStatus.gpsError;
+        final isActive = state.isTrackingActive;
+        final pending = state.pendingCount;
+
+        final Color color;
+        final IconData icon;
+        if (hasError) {
+          color = const Color(0xFFFF5252);
+          icon = Icons.gps_not_fixed;
+        } else if (isActive) {
+          color = const Color(0xFF00E676);
+          icon = Icons.gps_fixed;
+        } else {
+          color = Colors.white54;
+          icon = Icons.gps_off;
+        }
+
+        String tooltip;
+        if (hasError) {
+          tooltip = state.errorMessage ?? 'Error de GPS';
+        } else if (!isActive) {
+          tooltip = 'GPS inactivo (inicia jornada para activar)';
+        } else if (state.isSyncing) {
+          tooltip = 'Sincronizando posiciones...';
+        } else if (pending > 0) {
+          tooltip = 'GPS activo · $pending pendientes de envío';
+        } else if (state.lastSyncedAt != null) {
+          final mins =
+              DateTime.now().difference(state.lastSyncedAt!).inMinutes;
+          tooltip = mins < 1
+              ? 'GPS activo · enviado al servidor'
+              : 'GPS activo · última sync hace $mins min';
+        } else {
+          tooltip = 'GPS activo · capturando (aún sin sync)';
+        }
+
+        return Tooltip(
+          message: tooltip,
+          child: InkWell(
+            onTap: hasError
+                ? () => _showGpsHelpDialog(context, state.errorMessage)
+                : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: color, size: 22),
+                  if (isActive && pending > 0) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFC107),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$pending',
+                        style: const TextStyle(
+                          color: Color(0xFF263238),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showGpsHelpDialog(BuildContext context, String? error) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('GPS no disponible'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (error != null) ...[
+                Text(error, style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 16),
+              ],
+              const Text(
+                'Cómo comprobar que funciona:\n'
+                '1. Acepta el permiso de ubicación.\n'
+                '2. Emulador Android: menú ⋯ → Location → elige una ciudad.\n'
+                '3. Teléfono: activa GPS en Ajustes.\n'
+                '4. Inicia jornada de nuevo.\n'
+                '5. En consola busca [GPS] Guardado local.\n'
+                '6. Chip verde = capturando; número amarillo = pendientes.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
       ),
     );
   }
@@ -237,38 +436,6 @@ class _SyncStatusIcon extends StatelessWidget {
   }
 }
 
-class _GpsStatusIcon extends StatelessWidget {
-  const _GpsStatusIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<TelemetryBloc, TelemetryState>(
-      builder: (context, state) {
-        final isActive = state.isTrackingActive;
-        final hasError = state.status == TelemetryStatus.gpsError;
-        final color = isActive
-            ? const Color(0xFF00E676)
-            : hasError
-                ? const Color(0xFFFFC107)
-                : const Color(0xFFD50000);
-        final tooltip = isActive
-            ? 'Telemetría GPS activa (cada 5s)'
-            : hasError
-                ? 'Error GPS — revisa permisos'
-                : 'GPS inactivo — inicia la jornada';
-
-        return Tooltip(
-          message: tooltip,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Icon(Icons.satellite_alt, color: color, size: 26),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _RouteHeader extends StatelessWidget {
   final RouteSheet route;
   final int stopsCount;
@@ -277,6 +444,7 @@ class _RouteHeader extends StatelessWidget {
   final bool canEnd;
   final VoidCallback onStart;
   final VoidCallback onEnd;
+  final VoidCallback? onMaintenance;
 
   const _RouteHeader({
     required this.route,
@@ -286,6 +454,7 @@ class _RouteHeader extends StatelessWidget {
     required this.canEnd,
     required this.onStart,
     required this.onEnd,
+    this.onMaintenance,
   });
 
   @override
@@ -381,6 +550,30 @@ class _RouteHeader extends StatelessWidget {
             isLoading: isSubmitting,
             onPressed: onEnd,
           ),
+          if (route.isJornadaActive) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF1A237E),
+                  side: const BorderSide(color: Color(0xFF1A237E), width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: isSubmitting ? null : onMaintenance,
+                icon: const Icon(Icons.build_circle_outlined),
+                label: const Text(
+                  'Reportar mantenimiento',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (!canStart && !canEnd)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),

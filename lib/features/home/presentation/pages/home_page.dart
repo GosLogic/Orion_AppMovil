@@ -3,8 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:orion_app/core/sync/sync_manager.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
-import 'package:orion_app/features/dispatch/presentation/pages/route_home_page.dart';
+import 'package:orion_app/features/dispatch/presentation/pages/route_sheets_list_page.dart';
+import 'package:orion_app/features/incidents/presentation/pages/maintenance_history_page.dart';
 import 'package:orion_app/features/incidents/presentation/pages/report_incident_page.dart';
+import 'package:orion_app/features/notifications/presentation/pages/notifications_list_page.dart';
 import 'package:orion_app/features/telemetry/presentation/pages/telemetry_status_page.dart';
 import 'package:orion_app/injection_container.dart';
 
@@ -45,7 +47,23 @@ class HomePage extends StatelessWidget {
             title: 'Hojas de ruta',
             subtitle: 'Paradas y entregas',
             onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const RouteHomePage()),
+              MaterialPageRoute(builder: (_) => const RouteSheetsListPage()),
+            ),
+          ),
+          _HomeTile(
+            icon: Icons.notifications_outlined,
+            title: 'Notificaciones',
+            subtitle: 'Alertas e información del conductor',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationsListPage()),
+            ),
+          ),
+          _HomeTile(
+            icon: Icons.build_circle_outlined,
+            title: 'Mantenimiento',
+            subtitle: 'Historial de solicitudes locales',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MaintenanceHistoryPage()),
             ),
           ),
           _HomeTile(

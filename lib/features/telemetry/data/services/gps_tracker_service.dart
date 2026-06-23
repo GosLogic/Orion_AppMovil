@@ -1,19 +1,22 @@
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:orion_app/core/utils/result.dart';
 import 'package:orion_app/features/telemetry/domain/entities/vehicle_position.dart';
 import 'package:orion_app/features/telemetry/domain/usecases/save_position_usecase.dart';
 
-/// Motor silencioso de telemetría GPS.
-/// Captura posiciones cada 5 segundos y persiste exclusivamente en SQLite.
+/// Motor de telemetría GPS. Captura posiciones y persiste en SQLite.
 class GpsTrackerService {
   GpsTrackerService({required SavePositionUseCase savePositionUseCase})
       : _savePositionUseCase = savePositionUseCase;
 
   final SavePositionUseCase _savePositionUseCase;
 
-  static const Duration captureInterval = Duration(seconds: 5);
+  VoidCallback? onPositionSaved;
+
+  static const Duration captureInterval = Duration(seconds: 15);
 
   Timer? _timer;
   int? _vehicleId;
@@ -31,9 +34,15 @@ class GpsTrackerService {
     _routeSheetId = routeSheetId;
     _isTracking = true;
 
-    await _captureAndPersist();
-
-    _timer = Timer.periodic(captureInterval, (_) => _captureAndPersist());
+    try {
+      await _captureAndPersist();
+      _timer = Timer.periodic(captureInterval, (_) => _captureSafely());
+    } catch (e) {
+      _isTracking = false;
+      _vehicleId = null;
+      _routeSheetId = null;
+      rethrow;
+    }
   }
 
   Future<void> stopTracking() async {
@@ -47,7 +56,10 @@ class GpsTrackerService {
   Future<void> _ensureLocationPermissions() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw const GpsTrackerException('Servicio de ubicación desactivado');
+      throw const GpsTrackerException(
+        'Servicio de ubicación desactivado. Actívalo en Ajustes del teléfono '
+        'o en el emulador: Extended Controls → Location.',
+      );
     }
 
     var permission = await Geolocator.checkPermission();
@@ -56,49 +68,106 @@ class GpsTrackerService {
     }
 
     if (permission == LocationPermission.denied) {
-      throw const GpsTrackerException('Permiso de ubicación denegado');
+      throw const GpsTrackerException(
+        'Permiso de ubicación denegado. Acepta el permiso cuando la app lo pida.',
+      );
     }
 
     if (permission == LocationPermission.deniedForever) {
       throw const GpsTrackerException(
-        'Permiso de ubicación denegado permanentemente',
+        'Permiso denegado permanentemente. Ve a Ajustes → Apps → Orion → '
+        'Permisos → Ubicación y actívalo.',
       );
+    }
+  }
+
+  Future<void> _captureSafely() async {
+    try {
+      await _captureAndPersist();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[GPS] Captura periódica fallida: $e');
+      }
     }
   }
 
   Future<void> _captureAndPersist() async {
     if (!_isTracking || _vehicleId == null) return;
 
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 4),
-        ),
+    final position = await _readPosition();
+
+    final lat = position.latitude;
+    final lng = position.longitude;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      throw GpsTrackerException(
+        'Coordenadas inválidas ($lat, $lng)',
       );
+    }
 
-      final heading = position.heading.round().clamp(0, 359);
-      final speedKmh = (position.speed * 3.6).clamp(0.0, 300.0);
+    final heading = position.heading.isNaN
+        ? 0
+        : position.heading.round().clamp(0, 359);
+    final speedKmh = position.speed.isNaN
+        ? 0.0
+        : (position.speed * 3.6).clamp(0.0, 300.0);
 
-      final vehiclePosition = VehiclePosition(
-        time: DateTime.now().toUtc(),
-        vehicleId: _vehicleId!,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        speedKmh: speedKmh,
-        heading: heading,
-        routeSheetId: _routeSheetId,
-        isMocked: position.isMocked,
+    final vehiclePosition = VehiclePosition(
+      time: DateTime.now(),
+      vehicleId: _vehicleId!,
+      latitude: lat,
+      longitude: lng,
+      speedKmh: speedKmh,
+      heading: heading,
+      routeSheetId: _routeSheetId,
+      isMocked: position.isMocked,
+    );
+
+    final result = await _savePositionUseCase(vehiclePosition);
+    if (result case Error(failure: final failure)) {
+      throw GpsTrackerException(failure.message);
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[GPS] Guardado local: $lat, $lng · vehicle=${_vehicleId!} '
+        '· mocked=${position.isMocked}',
       );
+    }
 
-      final result = await _savePositionUseCase(vehiclePosition);
-      if (result case Error(failure: final failure)) {
-        throw GpsTrackerException(failure.message);
+    onPositionSaved?.call();
+  }
+
+  /// Última posición conocida primero; si no hay, espera fix actual (emulador).
+  Future<Position> _readPosition() async {
+    const settings = LocationSettings(
+      accuracy: LocationAccuracy.medium,
+      timeLimit: Duration(seconds: 20),
+    );
+
+    final lastKnown = await Geolocator.getLastKnownPosition();
+    if (lastKnown != null) {
+      final age = DateTime.now().difference(lastKnown.timestamp);
+      if (age.inMinutes < 5) {
+        if (kDebugMode) {
+          debugPrint('[GPS] Usando última posición conocida (${age.inSeconds}s)');
+        }
+        return lastKnown;
       }
-    } on GpsTrackerException {
-      rethrow;
+    }
+
+    try {
+      return await Geolocator.getCurrentPosition(locationSettings: settings);
     } catch (e) {
-      throw GpsTrackerException('Error capturando posición: $e');
+      if (lastKnown != null) {
+        if (kDebugMode) {
+          debugPrint('[GPS] getCurrentPosition falló, usando lastKnown: $e');
+        }
+        return lastKnown;
+      }
+      throw GpsTrackerException(
+        'No se pudo obtener ubicación: $e. '
+        'En emulador: Extended Controls (⋯) → Location → elige un punto.',
+      );
     }
   }
 }

@@ -8,6 +8,10 @@ abstract class TelemetryLocalDataSource {
 
   Future<List<VehiclePositionModel>> getUnsyncedPositions({int limit = 100});
 
+  Future<int> countUnsyncedPositions();
+
+  Future<bool> existsPosition(int vehicleId, String timeIso);
+
   Future<void> markAsSynced(List<int> ids);
 }
 
@@ -21,10 +25,28 @@ class TelemetryLocalDataSourceImpl implements TelemetryLocalDataSource {
   Future<void> insertPosition(VehiclePosition position) async {
     final db = await _databaseHelper.database;
     final model = VehiclePositionModel.fromEntity(position);
+    final timeIso = model.toMap()['time'] as String;
+
+    final exists = await existsPosition(position.vehicleId, timeIso);
+    if (exists) return;
+
     await db.insert(
       DatabaseConstants.vehiclePositionsTable,
       model.toMap(),
     );
+  }
+
+  @override
+  Future<bool> existsPosition(int vehicleId, String timeIso) async {
+    final db = await _databaseHelper.database;
+    final rows = await db.query(
+      DatabaseConstants.vehiclePositionsTable,
+      columns: ['id'],
+      where: 'vehicle_id = ? AND time = ?',
+      whereArgs: [vehicleId, timeIso],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
   }
 
   @override
@@ -39,6 +61,16 @@ class TelemetryLocalDataSourceImpl implements TelemetryLocalDataSource {
       limit: limit,
     );
     return rows.map(VehiclePositionModel.fromMap).toList();
+  }
+
+  @override
+  Future<int> countUnsyncedPositions() async {
+    final db = await _databaseHelper.database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS cnt FROM ${DatabaseConstants.vehiclePositionsTable} '
+      'WHERE synced = 0',
+    );
+    return (result.first['cnt'] as int?) ?? 0;
   }
 
   @override

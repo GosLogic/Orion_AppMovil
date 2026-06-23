@@ -7,7 +7,6 @@ import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_event.dar
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_state.dart';
 import 'package:orion_app/features/dispatch/presentation/pages/proof_of_delivery_page.dart';
 import 'package:orion_app/features/dispatch/presentation/widgets/stop_status_badge.dart';
-import 'package:orion_app/features/incidents/presentation/pages/report_incident_page.dart';
 
 class StopDetailPage extends StatelessWidget {
   final TripStop tripStop;
@@ -23,9 +22,44 @@ class StopDetailPage extends StatelessWidget {
         backgroundColor: const Color(0xFF1A237E),
         foregroundColor: Colors.white,
       ),
-      body: BlocBuilder<DispatchBloc, DispatchState>(
+      body: BlocListener<DispatchBloc, DispatchState>(
+        listenWhen: (previous, current) =>
+            previous.successMessage != current.successMessage ||
+            previous.errorMessage != current.errorMessage,
+        listener: (context, state) {
+          if (state.successMessage != null) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.successMessage!,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  backgroundColor: const Color(0xFF2E7D32),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+          }
+          if (state.errorMessage != null) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    state.errorMessage!,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  backgroundColor: const Color(0xFFC62828),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+          }
+        },
+        child: BlocBuilder<DispatchBloc, DispatchState>(
         builder: (context, state) {
           final isSubmitting = state.status == DispatchStatus.submitting;
+          final jornadaActive = state.isJornadaActive;
           final currentStop = state.tripStops
                   .where((s) => s.id == tripStop.id)
                   .firstOrNull ??
@@ -88,7 +122,8 @@ class StopDetailPage extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            if (currentStop.status == TripStopStatus.pending) ...[
+                            if (currentStop.status == TripStopStatus.pending &&
+                                jornadaActive) ...[
                               const SizedBox(height: 16),
                               SizedBox(
                                 width: double.infinity,
@@ -190,10 +225,12 @@ class StopDetailPage extends StatelessWidget {
                     .where((d) => !d.isCompleted)
                     .firstOrNull,
                 isSubmitting: isSubmitting,
+                jornadaActive: jornadaActive,
               ),
             ],
           );
         },
+        ),
       ),
     );
   }
@@ -203,11 +240,13 @@ class _ActionButtons extends StatelessWidget {
   final TripStop tripStop;
   final Delivery? pendingDelivery;
   final bool isSubmitting;
+  final bool jornadaActive;
 
   const _ActionButtons({
     required this.tripStop,
     required this.pendingDelivery,
     required this.isSubmitting,
+    required this.jornadaActive,
   });
 
   @override
@@ -238,7 +277,7 @@ class _ActionButtons extends StatelessWidget {
                 ),
                 elevation: 3,
               ),
-              onPressed: isSubmitting || pendingDelivery == null
+              onPressed: isSubmitting || pendingDelivery == null || !jornadaActive
                   ? null
                   : () {
                       Navigator.of(context).push(
@@ -246,39 +285,15 @@ class _ActionButtons extends StatelessWidget {
                           builder: (_) => ProofOfDeliveryPage(
                             deliveryId: pendingDelivery!.id,
                             customerName: pendingDelivery!.customerName,
+                            packageDescription:
+                                pendingDelivery!.packageDescription,
                           ),
                         ),
                       );
                     },
-              icon: const Icon(Icons.camera_alt, size: 28),
+              icon: const Icon(Icons.check_circle_outline, size: 28),
               label: const Text(
-                'Registrar Entrega (Cámara/Firma)',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFE65100),
-                side: const BorderSide(color: Color(0xFFE65100), width: 2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ReportIncidentPage(stopId: tripStop.id),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.report_problem, size: 26),
-              label: const Text(
-                'Reportar Incidente',
+                'Registrar Entrega',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
               ),
             ),

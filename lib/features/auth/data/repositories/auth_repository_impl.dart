@@ -6,6 +6,7 @@ import 'package:orion_app/features/auth/data/datasources/auth_local_datasource.d
 import 'package:orion_app/features/auth/data/datasources/auth_remote_datasource.dart';
 
 import 'package:orion_app/features/auth/data/models/login_request_model.dart';
+import 'package:orion_app/features/auth/data/utils/auth_error_mapper.dart';
 import 'package:orion_app/features/auth/domain/entities/auth_credentials.dart';
 import 'package:orion_app/features/auth/domain/entities/driver_session.dart';
 import 'package:orion_app/features/auth/domain/repositories/auth_repository.dart';
@@ -34,7 +35,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _localDataSource.saveSession(session);
       return Success(session.toEntity());
     } on DioException catch (e) {
-      return Error(AuthFailure(e.message ?? 'Error al iniciar sesión'));
+      return Error(AuthFailure(mapAuthLoginError(e)));
     } catch (e) {
       return Error(CacheFailure(e.toString()));
     }

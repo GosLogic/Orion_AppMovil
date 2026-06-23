@@ -9,6 +9,10 @@ abstract class IncidentsRepository {
     MaintenanceRequest request,
   );
 
+  Future<Result<List<MaintenanceRequest>>> getMaintenanceHistory();
+
+  Future<Result<int>> syncPendingMaintenance();
+
   Future<Result<RouteIncident>> triggerPanicAlert({
     required double latitude,
     required double longitude,

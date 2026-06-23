@@ -11,6 +11,7 @@ class MaintenanceRequestModel extends MaintenanceRequest {
     required super.reportedAt,
     super.photoEvidencePath,
     super.synced = false,
+    super.serverStatus,
   });
 
   factory MaintenanceRequestModel.fromEntity(MaintenanceRequest request) {
@@ -22,6 +23,7 @@ class MaintenanceRequestModel extends MaintenanceRequest {
       reportedAt: request.reportedAt,
       photoEvidencePath: request.photoEvidencePath,
       synced: request.synced,
+      serverStatus: request.serverStatus,
     );
   }
 
@@ -42,6 +44,7 @@ class MaintenanceRequestModel extends MaintenanceRequest {
       ),
       photoEvidencePath: json['photo_evidence_path'] as String?,
       synced: json['synced'] == true || json['synced'] == 1,
+      serverStatus: json['status'] as String?,
     );
   }
 
@@ -69,10 +72,26 @@ class MaintenanceRequestModel extends MaintenanceRequest {
         'vehicle_id': vehicleId,
         'description': description,
         'severity': _severityToApi(severity),
-        'reported_at': reportedAt.toIso8601String(),
+        'reported_at': reportedAt.toUtc().toIso8601String(),
         'photo_evidence_path': photoEvidencePath,
         'synced': synced,
+        if (serverStatus != null) 'status': serverStatus,
       };
+
+  /// Payload para POST al backend (sin synced).
+  Map<String, dynamic> toApiJson() {
+    final json = <String, dynamic>{
+      'id': id,
+      'vehicle_id': vehicleId,
+      'description': description,
+      'severity': _severityToApi(severity),
+      'reported_at': reportedAt.toUtc().toIso8601String(),
+    };
+    if (photoEvidencePath != null && photoEvidencePath!.isNotEmpty) {
+      json['photo_evidence_path'] = photoEvidencePath;
+    }
+    return json;
+  }
 
   Map<String, dynamic> toLocalMap() => {
         'id': id,
@@ -92,5 +111,6 @@ class MaintenanceRequestModel extends MaintenanceRequest {
         reportedAt: reportedAt,
         photoEvidencePath: photoEvidencePath,
         synced: synced,
+        serverStatus: serverStatus,
       );
 }

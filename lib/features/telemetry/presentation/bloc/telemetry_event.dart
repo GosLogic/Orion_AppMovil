@@ -23,3 +23,7 @@ class StartTelemetry extends TelemetryEvent {
 class StopTelemetry extends TelemetryEvent {
   const StopTelemetry();
 }
+
+class RefreshTelemetryStatus extends TelemetryEvent {
+  const RefreshTelemetryStatus();
+}

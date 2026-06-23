@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:orion_app/core/constants/api_constants.dart';
 import 'package:orion_app/core/network/api_client.dart';
 import 'package:orion_app/features/dispatch/data/models/delivery_model.dart';
 import 'package:orion_app/features/dispatch/data/models/route_sheet_model.dart';
 import 'package:orion_app/features/dispatch/data/models/trip_stop_model.dart';
+import 'package:orion_app/features/dispatch/data/utils/dispatch_integration_log.dart';
 
 abstract class DispatchRemoteDataSource {
   Future<List<RouteSheetModel>> fetchRouteSheets();
@@ -20,30 +22,71 @@ class DispatchRemoteDataSourceImpl implements DispatchRemoteDataSource {
 
   @override
   Future<List<RouteSheetModel>> fetchRouteSheets() async {
-    final response = await _apiClient.get(ApiConstants.routeSheets);
-    final list = response.data as List<dynamic>;
-    return list
-        .map((e) => RouteSheetModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    const path = ApiConstants.routeSheets;
+    DispatchIntegrationLog.request(method: 'GET', path: path);
+
+    try {
+      final response = await _apiClient.get(path);
+      DispatchIntegrationLog.response(response);
+
+      final data = response.data;
+      if (data is! List) return [];
+
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(RouteSheetModel.fromJson)
+          .toList();
+    } on DioException catch (e) {
+      DispatchIntegrationLog.error(e);
+      rethrow;
+    }
   }
 
   @override
   Future<List<TripStopModel>> fetchTripStops(String routeSheetId) async {
-    final response = await _apiClient.get(
-      ApiConstants.tripStops,
-      queryParameters: {'route_sheet_id': routeSheetId},
+    const path = ApiConstants.tripStops;
+    DispatchIntegrationLog.request(
+      method: 'GET',
+      path: '$path?route_sheet_id=$routeSheetId',
     );
-    final list = response.data as List<dynamic>;
-    return list
-        .map((e) => TripStopModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+
+    try {
+      final response = await _apiClient.get(
+        path,
+        queryParameters: {'route_sheet_id': routeSheetId},
+      );
+      DispatchIntegrationLog.response(response);
+
+      final data = response.data;
+      if (data is! List) return [];
+
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(TripStopModel.fromJson)
+          .toList();
+    } on DioException catch (e) {
+      DispatchIntegrationLog.error(e);
+      rethrow;
+    }
   }
 
   @override
   Future<void> submitDelivery(DeliveryModel delivery) async {
-    await _apiClient.post(
-      ApiConstants.deliveries,
-      data: delivery.toJson(),
+    const path = ApiConstants.deliveries;
+    final payload = delivery.toApiPayload();
+    DispatchIntegrationLog.request(
+      method: 'POST',
+      path: path,
+      body: payload,
     );
+
+    try {
+      final response = await _apiClient.post(path, data: payload);
+      DispatchIntegrationLog.response(response);
+      // Backend responde solo {id, status}; no parseamos entrega completa.
+    } on DioException catch (e) {
+      DispatchIntegrationLog.error(e);
+      rethrow;
+    }
   }
 }

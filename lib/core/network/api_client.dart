@@ -115,6 +115,7 @@ class _MultiTenantAuthInterceptor extends Interceptor {
   ) async {
     final jwt = await _tokenProvider.getJwt();
     final tenantId = await _tokenProvider.getTenantId();
+    final driverId = await _tokenProvider.getDriverId();
 
     if (jwt == null || jwt.isEmpty) {
       handler.reject(
@@ -141,6 +142,9 @@ class _MultiTenantAuthInterceptor extends Interceptor {
     options.headers[ApiConstants.authorizationHeader] =
         '${ApiConstants.bearerPrefix}$jwt';
     options.headers[ApiConstants.tenantIdHeader] = tenantId;
+    if (driverId != null && driverId.isNotEmpty) {
+      options.headers[ApiConstants.driverIdHeader] = driverId;
+    }
 
     handler.next(options);
   }

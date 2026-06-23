@@ -62,6 +62,12 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource, AuthTokenProvider 
   Future<String?> getTenantId() => _secureStorage.read(key: _tenantIdKey);
 
   @override
+  Future<String?> getDriverId() async {
+    final session = await getSession();
+    return session?.driverId;
+  }
+
+  @override
   Future<bool> hasValidSession() async {
     final session = await getSession();
     return session != null && session.isValid;

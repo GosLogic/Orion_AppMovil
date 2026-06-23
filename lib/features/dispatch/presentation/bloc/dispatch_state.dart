@@ -13,15 +13,19 @@ class DispatchState extends Equatable {
   final List<Delivery> deliveries;
   final String? successMessage;
   final String? errorMessage;
+  final List<RouteSheet> routeSheets;
+  final String? infoMessage;
 
   const DispatchState({
     this.status = DispatchStatus.initial,
     this.dailyRoute,
+    this.routeSheets = const [],
     this.tripStops = const [],
     this.selectedStop,
     this.deliveries = const [],
     this.successMessage,
     this.errorMessage,
+    this.infoMessage,
   });
 
   bool get isJornadaActive => dailyRoute?.isJornadaActive ?? false;
@@ -33,17 +37,20 @@ class DispatchState extends Equatable {
   DispatchState copyWith({
     DispatchStatus? status,
     RouteSheet? dailyRoute,
+    List<RouteSheet>? routeSheets,
     List<TripStop>? tripStops,
     TripStop? selectedStop,
     List<Delivery>? deliveries,
     String? successMessage,
     String? errorMessage,
+    String? infoMessage,
     bool clearMessages = false,
     bool clearSelectedStop = false,
   }) {
     return DispatchState(
       status: status ?? this.status,
       dailyRoute: dailyRoute ?? this.dailyRoute,
+      routeSheets: routeSheets ?? this.routeSheets,
       tripStops: tripStops ?? this.tripStops,
       selectedStop:
           clearSelectedStop ? null : (selectedStop ?? this.selectedStop),
@@ -51,6 +58,7 @@ class DispatchState extends Equatable {
       successMessage:
           clearMessages ? null : (successMessage ?? this.successMessage),
       errorMessage: clearMessages ? null : (errorMessage ?? this.errorMessage),
+      infoMessage: clearMessages ? null : (infoMessage ?? this.infoMessage),
     );
   }
 
@@ -58,10 +66,12 @@ class DispatchState extends Equatable {
   List<Object?> get props => [
         status,
         dailyRoute,
+        routeSheets,
         tripStops,
         selectedStop,
         deliveries,
         successMessage,
         errorMessage,
+        infoMessage,
       ];
 }

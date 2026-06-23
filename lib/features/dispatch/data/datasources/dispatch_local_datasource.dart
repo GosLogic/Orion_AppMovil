@@ -4,12 +4,14 @@ import 'package:orion_app/features/dispatch/data/models/delivery_model.dart';
 import 'package:orion_app/features/dispatch/data/models/route_sheet_model.dart';
 
 import 'package:orion_app/features/dispatch/data/models/trip_stop_model.dart';
-import 'package:orion_app/features/dispatch/domain/entities/route_sheet.dart';
-import 'package:orion_app/features/dispatch/domain/entities/trip_stop.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract class DispatchLocalDataSource {
-  Future<void> seedDemoDataIfEmpty();
+  /// Borra ruta, paradas y entregas (p. ej. conductor sin hoja asignada).
+  Future<void> clearDispatchData();
+
+  /// Borra solo ruta y paradas; conserva entregas locales (POD offline).
+  Future<void> clearRouteAndStops();
 
   Future<RouteSheetModel?> getDailyRouteSheet();
 
@@ -33,72 +35,21 @@ class DispatchLocalDataSourceImpl implements DispatchLocalDataSource {
   final DatabaseHelper _databaseHelper;
 
   @override
-  Future<void> seedDemoDataIfEmpty() async {
-    final existing = await getRouteSheets();
-    if (existing.isNotEmpty) return;
+  Future<void> clearDispatchData() async {
+    await clearRouteAndStops();
+    final db = await _databaseHelper.database;
+    await db.delete(DatabaseConstants.deliveriesTable);
+  }
 
-    final today = DateTime.now();
-    const routeId = 'route-demo-001';
-
-    final route = RouteSheetModel(
-      id: routeId,
-      tenantId: 'tenant-demo',
-      driverId: 'driver-demo',
-      vehicleId: 'vehicle-001',
-      vehiclePlate: 'ABC-1234',
-      vehicleModel: 'Mercedes Sprinter 2024',
-      status: RouteSheetStatus.assigned,
-      scheduledDate: today,
-    );
-
-    final baseHour = DateTime(today.year, today.month, today.day, 8);
-    final stops = [
-      TripStopModel(
-        id: 'stop-001',
-        routeSheetId: routeId,
-        sequence: 1,
-        locationName: 'Bodega Central',
-        address: 'Av. Industrial 1200, Zona Norte',
-        estimatedArrival: baseHour.add(const Duration(hours: 1)),
-        status: TripStopStatus.pending,
-      ),
-      TripStopModel(
-        id: 'stop-002',
-        routeSheetId: routeId,
-        sequence: 2,
-        locationName: 'Supermercado El Ahorro',
-        address: 'Calle 5 #45-12, Centro',
-        estimatedArrival: baseHour.add(const Duration(hours: 2, minutes: 30)),
-        status: TripStopStatus.pending,
-      ),
-      TripStopModel(
-        id: 'stop-003',
-        routeSheetId: routeId,
-        sequence: 3,
-        locationName: 'Farmacia Salud Total',
-        address: 'Carrera 80 #10-55, Sur',
-        estimatedArrival: baseHour.add(const Duration(hours: 4)),
-        status: TripStopStatus.pending,
-      ),
-    ];
-
-    await saveRouteSheet(route);
-    for (final stop in stops) {
-      await saveTripStop(stop);
-      await saveDelivery(
-        DeliveryModel(
-          id: 'del-${stop.id}-1',
-          tripStopId: stop.id,
-          customerName: 'Cliente ${stop.sequence}',
-          packageDescription: 'Paquete estándar #${stop.sequence}',
-        ),
-      );
-    }
+  @override
+  Future<void> clearRouteAndStops() async {
+    final db = await _databaseHelper.database;
+    await db.delete(DatabaseConstants.tripStopsTable);
+    await db.delete(DatabaseConstants.routeSheetsTable);
   }
 
   @override
   Future<RouteSheetModel?> getDailyRouteSheet() async {
-    await seedDemoDataIfEmpty();
     final sheets = await getRouteSheets();
     if (sheets.isEmpty) return null;
 

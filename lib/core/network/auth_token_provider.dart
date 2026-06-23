@@ -4,5 +4,7 @@ abstract class AuthTokenProvider {
 
   Future<String?> getTenantId();
 
+  Future<String?> getDriverId();
+
   Future<bool> hasValidSession();
 }

@@ -40,9 +40,7 @@ class DeliveryModel extends Delivery {
           ? DateTime.parse(json['delivered_at'] as String)
           : null,
       synced: json['synced'] == true || json['synced'] == 1,
-      isCompleted: json['is_completed'] == true ||
-          json['is_completed'] == 1 ||
-          proof != null,
+      isCompleted: json['is_completed'] == true || json['is_completed'] == 1,
     );
   }
 
@@ -79,10 +77,25 @@ class DeliveryModel extends Delivery {
         'synced': synced,
       };
 
+  /// Payload para POST /dispatch/deliveries (booleanos explícitos, synced=false).
+  Map<String, dynamic> toApiPayload() => {
+        'id': id,
+        'trip_stop_id': tripStopId,
+        'customer_name': customerName,
+        'package_description': packageDescription,
+        'proof_type': proof?.type.name,
+        'photo_path': proof?.photoPath,
+        'signature_path': proof?.signaturePath,
+        'notes': proof?.notes,
+        'delivered_at': (deliveredAt ?? DateTime.now()).toIso8601String(),
+        'is_completed': isCompleted,
+        'synced': false,
+      };
+
   Map<String, dynamic> toLocalMap() => {
         'id': id,
         'trip_stop_id': tripStopId,
-        'proof_type': proof?.type.name ?? 'photo',
+        'proof_type': proof?.type.name ?? '',
         'photo_path': proof?.photoPath,
         'signature_path': proof?.signaturePath,
         'notes': proof?.notes,

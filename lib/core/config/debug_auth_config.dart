@@ -9,8 +9,15 @@ class DebugAuthConfig {
   static const String demoEmail = 'conductor@empresa.com';
   static const String demoPassword = '123456';
 
+  /// Si es `true`, el login siempre llama al IAM real (incluso con credenciales demo).
+  static const bool useRealAuthInDebug = bool.fromEnvironment(
+    'USE_REAL_AUTH',
+    defaultValue: true,
+  );
+
   static bool matchesDemoCredentials(AuthCredentials credentials) {
     if (!kDebugMode) return false;
+    if (useRealAuthInDebug) return false;
     return credentials.email.trim().toLowerCase() == demoEmail &&
         credentials.password == demoPassword;
   }

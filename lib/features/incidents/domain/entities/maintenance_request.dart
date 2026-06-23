@@ -10,6 +10,7 @@ class MaintenanceRequest extends Equatable {
   final DateTime reportedAt;
   final String? photoEvidencePath;
   final bool synced;
+  final String? serverStatus;
 
   const MaintenanceRequest({
     required this.id,
@@ -19,6 +20,7 @@ class MaintenanceRequest extends Equatable {
     required this.reportedAt,
     this.photoEvidencePath,
     this.synced = false,
+    this.serverStatus,
   });
 
   String get severityLabel => switch (severity) {
@@ -28,6 +30,29 @@ class MaintenanceRequest extends Equatable {
         MaintenanceSeverity.critical => 'Crítico',
       };
 
+  MaintenanceRequest copyWith({
+    String? id,
+    String? vehicleId,
+    String? description,
+    MaintenanceSeverity? severity,
+    DateTime? reportedAt,
+    String? photoEvidencePath,
+    bool? synced,
+    String? serverStatus,
+  }) {
+    return MaintenanceRequest(
+      id: id ?? this.id,
+      vehicleId: vehicleId ?? this.vehicleId,
+      description: description ?? this.description,
+      severity: severity ?? this.severity,
+      reportedAt: reportedAt ?? this.reportedAt,
+      photoEvidencePath: photoEvidencePath ?? this.photoEvidencePath,
+      synced: synced ?? this.synced,
+      serverStatus: serverStatus ?? this.serverStatus,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, vehicleId, severity, reportedAt];
+  List<Object?> get props =>
+      [id, vehicleId, severity, reportedAt, synced, serverStatus];
 }

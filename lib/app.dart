@@ -5,9 +5,10 @@ import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_state.dart';
 import 'package:orion_app/features/auth/presentation/pages/login_page.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_bloc.dart';
-import 'package:orion_app/features/home/presentation/pages/home_page.dart';
-import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.dart';
+import 'package:orion_app/features/dispatch/presentation/pages/route_sheets_list_page.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_bloc.dart';
+import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.dart';
+import 'package:orion_app/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:orion_app/injection_container.dart';
 
 class OrionApp extends StatelessWidget {
@@ -28,6 +29,9 @@ class OrionApp extends StatelessWidget {
         ),
         BlocProvider<IncidentsBloc>(
           create: (_) => sl.get<IncidentsBloc>(),
+        ),
+        BlocProvider<NotificationsBloc>(
+          create: (_) => sl.get<NotificationsBloc>(),
         ),
       ],
       child: BlocListener<AuthBloc, AuthState>(
@@ -68,7 +72,7 @@ class OrionApp extends StatelessWidget {
           home: BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
               return switch (state.status) {
-                AuthStatus.authenticated => const HomePage(),
+                AuthStatus.authenticated => const RouteSheetsListPage(),
                 AuthStatus.initial || AuthStatus.loading =>
                   const _SplashScreen(),
                 _ => const LoginPage(),

@@ -8,7 +8,6 @@ import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_state.dart';
 import 'package:orion_app/features/auth/presentation/widgets/custom_text_field.dart';
 import 'package:orion_app/features/auth/presentation/widgets/primary_button.dart';
-import 'package:orion_app/features/home/presentation/pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -105,15 +104,6 @@ class _LoginPageState extends State<LoginPage> {
               previous.status != current.status ||
               previous.errorMessage != current.errorMessage,
           listener: (context, state) {
-            if (state.status == AuthStatus.authenticated) {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute<void>(
-                  builder: (_) => const HomePage(),
-                ),
-              );
-              return;
-            }
-
             if (state.status == AuthStatus.error &&
                 state.errorMessage != null) {
               _showErrorSnackBar(context, state.errorMessage!);

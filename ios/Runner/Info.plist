@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Orion necesita tu ubicación para registrar la telemetría GPS durante la jornada de reparto.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Orion registra tu posición mientras la jornada está activa para el seguimiento de la flota.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>
