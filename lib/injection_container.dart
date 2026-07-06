@@ -1,4 +1,5 @@
 import 'package:orion_app/core/database/database_helper.dart';
+import 'package:orion_app/core/location/device_location_service.dart';
 import 'package:orion_app/core/network/api_client.dart';
 import 'package:orion_app/core/network/auth_dio_factory.dart';
 import 'package:orion_app/core/network/maintenance_api_client.dart';
@@ -82,13 +83,19 @@ Future<void> initDependencies() async {
   sl.registerSingleton<AuthTokenProvider>(authLocal);
 
   sl.registerSingleton<ApiClient>(
-    ApiClient(tokenProvider: sl.get<AuthTokenProvider>()),
+    ApiClient(
+      tokenProvider: sl.get<AuthTokenProvider>(),
+      authLocalDataSource: authLocal,
+    ),
   );
+
+  sl.registerSingleton<DeviceLocationService>(DeviceLocationService());
 
   sl.registerSingleton<SyncManager>(
     SyncManager(
       databaseHelper: sl.get<DatabaseHelper>(),
       apiClient: sl.get<ApiClient>(),
+      authLocalDataSource: authLocal,
     ),
   );
 
@@ -131,6 +138,7 @@ Future<void> initDependencies() async {
       localDataSource: sl.get<DispatchLocalDataSource>(),
       remoteDataSource: sl.get<DispatchRemoteDataSource>(),
       syncManager: sl.get<SyncManager>(),
+      deviceLocationService: sl.get<DeviceLocationService>(),
     ),
   );
   sl.registerSingleton<LoadRouteSheetsUseCase>(

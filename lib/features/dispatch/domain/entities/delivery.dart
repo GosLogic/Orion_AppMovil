@@ -10,6 +10,8 @@ class Delivery extends Equatable {
   final DateTime? deliveredAt;
   final bool synced;
   final bool isCompleted;
+  final double? latitude;
+  final double? longitude;
 
   const Delivery({
     required this.id,
@@ -20,6 +22,8 @@ class Delivery extends Equatable {
     this.deliveredAt,
     this.synced = false,
     this.isCompleted = false,
+    this.latitude,
+    this.longitude,
   });
 
   Delivery copyWith({
@@ -31,6 +35,8 @@ class Delivery extends Equatable {
     DateTime? deliveredAt,
     bool? synced,
     bool? isCompleted,
+    double? latitude,
+    double? longitude,
   }) {
     return Delivery(
       id: id ?? this.id,
@@ -41,9 +47,12 @@ class Delivery extends Equatable {
       deliveredAt: deliveredAt ?? this.deliveredAt,
       synced: synced ?? this.synced,
       isCompleted: isCompleted ?? this.isCompleted,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 
   @override
-  List<Object?> get props => [id, tripStopId, customerName, isCompleted];
+  List<Object?> get props =>
+      [id, tripStopId, customerName, isCompleted, latitude, longitude];
 }

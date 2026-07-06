@@ -5,9 +5,11 @@ String mapAuthLoginError(DioException exception) {
     case DioExceptionType.connectionTimeout:
     case DioExceptionType.sendTimeout:
     case DioExceptionType.receiveTimeout:
-      return 'Tiempo de espera agotado. Verifica que el backend esté en ejecución.';
+      return 'No se pudo conectar al backend. Verifica que docker esté activo, '
+          'que PC y celular estén en la misma Wi‑Fi, y que el firewall permita el puerto 8080.';
     case DioExceptionType.connectionError:
-      return 'Sin conexión al servidor. Revisa la red y la URL del API.';
+      return 'Sin conexión al servidor. En celular físico la app usa la IP de tu PC '
+          '(no localhost). Revisa la red y que el Gateway esté en :8080.';
     case DioExceptionType.badResponse:
       final statusCode = exception.response?.statusCode;
       if (statusCode == 401 || statusCode == 403) {

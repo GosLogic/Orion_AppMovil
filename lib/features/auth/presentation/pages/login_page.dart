@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:orion_app/core/config/debug_auth_config.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:orion_app/features/auth/domain/entities/auth_credentials.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
@@ -205,10 +203,6 @@ class _LoginPageState extends State<LoginPage> {
                           return null;
                         },
                       ),
-                      if (kDebugMode) ...[
-                        const SizedBox(height: 20),
-                        const _DebugCredentialsHint(),
-                      ],
                       const SizedBox(height: 36),
                       PrimaryButton(
                         label: 'Iniciar Jornada',
@@ -222,51 +216,6 @@ class _LoginPageState extends State<LoginPage> {
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-class _DebugCredentialsHint extends StatelessWidget {
-  const _DebugCredentialsHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFB300)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bug_report, size: 18, color: Colors.orange.shade800),
-              const SizedBox(width: 6),
-              Text(
-                'Modo debug — sin backend',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.orange.shade900,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Correo: ${DebugAuthConfig.demoEmail}\n'
-            'Contraseña: ${DebugAuthConfig.demoPassword}',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.orange.shade900,
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }

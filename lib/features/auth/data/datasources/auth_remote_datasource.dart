@@ -5,6 +5,10 @@ import 'package:orion_app/features/auth/data/models/login_request_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<DriverSessionModel> login(LoginRequestModel request);
+
+  Future<DriverSessionModel> refresh(String accessToken);
+
+  Future<void> logoutRemote(String accessToken);
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -20,6 +24,35 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
     return DriverSessionModel.fromJson(
       response.data as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<DriverSessionModel> refresh(String accessToken) async {
+    final response = await _dio.post(
+      ApiConstants.refreshToken,
+      options: Options(
+        headers: {
+          ApiConstants.authorizationHeader:
+              '${ApiConstants.bearerPrefix}$accessToken',
+        },
+      ),
+    );
+    return DriverSessionModel.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<void> logoutRemote(String accessToken) async {
+    await _dio.post(
+      ApiConstants.logout,
+      options: Options(
+        headers: {
+          ApiConstants.authorizationHeader:
+              '${ApiConstants.bearerPrefix}$accessToken',
+        },
+      ),
     );
   }
 }

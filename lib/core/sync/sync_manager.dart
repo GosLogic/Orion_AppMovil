@@ -5,9 +5,11 @@ import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:orion_app/core/auth/session_expired_notifier.dart';
 import 'package:orion_app/core/database/database_helper.dart';
 import 'package:orion_app/core/network/api_client.dart';
 import 'package:orion_app/core/sync/sync_queue_item.dart';
+import 'package:orion_app/features/auth/data/datasources/auth_local_datasource.dart';
 
 /// Gestor centralizado de sincronización offline-first.
 ///
@@ -17,13 +19,18 @@ class SyncManager {
   SyncManager({
     required DatabaseHelper databaseHelper,
     required ApiClient apiClient,
+    required AuthLocalDataSource authLocalDataSource,
     Connectivity? connectivity,
     Duration pollInterval = const Duration(seconds: 30),
     Duration baseBackoff = const Duration(seconds: 2),
     Duration maxBackoff = const Duration(minutes: 15),
     int maxConcurrent = 3,
+    SessionExpiredNotifier? sessionExpiredNotifier,
   })  : _databaseHelper = databaseHelper,
         _apiClient = apiClient,
+        _authLocalDataSource = authLocalDataSource,
+        _sessionExpiredNotifier =
+            sessionExpiredNotifier ?? SessionExpiredNotifier.instance,
         _connectivity = connectivity ?? Connectivity(),
         _pollInterval = pollInterval,
         _baseBackoff = baseBackoff,
@@ -32,6 +39,8 @@ class SyncManager {
 
   final DatabaseHelper _databaseHelper;
   final ApiClient _apiClient;
+  final AuthLocalDataSource _authLocalDataSource;
+  final SessionExpiredNotifier _sessionExpiredNotifier;
   final Connectivity _connectivity;
   final Duration _pollInterval;
   final Duration _baseBackoff;
@@ -164,6 +173,26 @@ class SyncManager {
         lastSyncedAt: DateTime.now(),
       );
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 409) {
+        await _databaseHelper.deleteSyncItem(item.id!);
+        stateNotifier.value = stateNotifier.value.copyWith(
+          lastSyncedAt: DateTime.now(),
+        );
+        debugPrint(
+          '[SyncManager] Item ${item.id} idempotente (409) — tratado como éxito',
+        );
+        return;
+      }
+      if (statusCode == 401) {
+        await _databaseHelper.deleteSyncItem(item.id!);
+        await _authLocalDataSource.clearSession();
+        _sessionExpiredNotifier.notify();
+        debugPrint(
+          '[SyncManager] Item ${item.id} rechazado (401) — sesión expirada',
+        );
+        return;
+      }
       await _handleRetry(processingItem, e.message ?? e.toString());
     } catch (e) {
       await _handleRetry(processingItem, e.toString());

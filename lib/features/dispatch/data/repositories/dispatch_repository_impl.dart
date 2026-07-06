@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:orion_app/core/constants/api_constants.dart';
 import 'package:orion_app/core/error/failures.dart';
+import 'package:orion_app/core/location/device_location_service.dart';
 import 'package:orion_app/core/sync/sync_manager.dart';
 import 'package:orion_app/core/utils/result.dart';
 import 'package:orion_app/features/dispatch/data/datasources/dispatch_local_datasource.dart';
@@ -20,13 +21,16 @@ class DispatchRepositoryImpl implements DispatchRepository {
     required DispatchLocalDataSource localDataSource,
     required DispatchRemoteDataSource remoteDataSource,
     required SyncManager syncManager,
+    required DeviceLocationService deviceLocationService,
   })  : _localDataSource = localDataSource,
         _remoteDataSource = remoteDataSource,
-        _syncManager = syncManager;
+        _syncManager = syncManager,
+        _deviceLocationService = deviceLocationService;
 
   final DispatchLocalDataSource _localDataSource;
   final DispatchRemoteDataSource _remoteDataSource;
   final SyncManager _syncManager;
+  final DeviceLocationService _deviceLocationService;
 
   @override
   Future<Result<List<RouteSheet>>> getRouteSheets() async {
@@ -235,11 +239,16 @@ class DispatchRepositoryImpl implements DispatchRepository {
       );
       await _localDataSource.saveTripStop(updated);
 
+      final location = await _deviceLocationService.captureForEvent();
+
       await _syncManager.enqueue(
         feature: 'dispatch',
         endpoint: '${ApiConstants.tripStops}/$tripStopId/arrived',
         method: 'PATCH',
-        payload: {'status': 'arrived'},
+        payload: {
+          'status': 'arrived',
+          ...location.toApiFields(),
+        },
       );
 
       return Success(updated.toEntity());
@@ -281,14 +290,19 @@ class DispatchRepositoryImpl implements DispatchRepository {
         return const Error(CacheFailure('Entrega no encontrada'));
       }
 
+      final location = await _deviceLocationService.captureForEvent();
+
       final updated = DeliveryModel(
         id: target.id,
         tripStopId: target.tripStopId,
         customerName: target.customerName,
         packageDescription: target.packageDescription,
+        proof: target.proof,
         deliveredAt: DateTime.now(),
         isCompleted: true,
         synced: false,
+        latitude: location.latitude,
+        longitude: location.longitude,
       );
 
       await _localDataSource.saveDelivery(updated);

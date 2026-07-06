@@ -10,4 +10,6 @@ abstract class AuthRepository {
   Future<Result<DriverSession?>> getActiveSession();
 
   Future<Result<bool>> isSessionValid();
+
+  Future<Result<DriverSession>> refreshSession();
 }

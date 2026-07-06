@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
+import 'package:orion_app/core/auth/session_expired_notifier.dart';
 import 'package:orion_app/core/constants/api_constants.dart';
 import 'package:orion_app/core/network/auth_token_provider.dart';
+import 'package:orion_app/features/auth/data/datasources/auth_local_datasource.dart';
 
 class ApiClient {
   ApiClient({
     required AuthTokenProvider tokenProvider,
+    AuthLocalDataSource? authLocalDataSource,
     String? baseUrl,
     Dio? dio,
   })  : _tokenProvider = tokenProvider,
+        _authLocalDataSource = authLocalDataSource,
         _dio = dio ??
             Dio(
               BaseOptions(
@@ -23,6 +29,7 @@ class ApiClient {
             ) {
     _dio.interceptors.addAll([
       _MultiTenantAuthInterceptor(_tokenProvider),
+      _SessionExpiredInterceptor(_authLocalDataSource),
       LogInterceptor(
         requestHeader: true,
         requestBody: true,
@@ -34,6 +41,7 @@ class ApiClient {
   }
 
   final AuthTokenProvider _tokenProvider;
+  final AuthLocalDataSource? _authLocalDataSource;
   final Dio _dio;
 
   Dio get dio => _dio;
@@ -114,8 +122,6 @@ class _MultiTenantAuthInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     final jwt = await _tokenProvider.getJwt();
-    final tenantId = await _tokenProvider.getTenantId();
-    final driverId = await _tokenProvider.getDriverId();
 
     if (jwt == null || jwt.isEmpty) {
       handler.reject(
@@ -128,23 +134,8 @@ class _MultiTenantAuthInterceptor extends Interceptor {
       return;
     }
 
-    if (tenantId == null || tenantId.isEmpty) {
-      handler.reject(
-        DioException(
-          requestOptions: options,
-          type: DioExceptionType.cancel,
-          message: 'TenantId obligatorio: contexto multi-tenant no resuelto.',
-        ),
-      );
-      return;
-    }
-
     options.headers[ApiConstants.authorizationHeader] =
         '${ApiConstants.bearerPrefix}$jwt';
-    options.headers[ApiConstants.tenantIdHeader] = tenantId;
-    if (driverId != null && driverId.isNotEmpty) {
-      options.headers[ApiConstants.driverIdHeader] = driverId;
-    }
 
     handler.next(options);
   }
@@ -163,6 +154,24 @@ class _MultiTenantAuthInterceptor extends Interceptor {
       return;
     }
 
+    handler.next(err);
+  }
+}
+
+class _SessionExpiredInterceptor extends Interceptor {
+  _SessionExpiredInterceptor(this._authLocalDataSource);
+
+  final AuthLocalDataSource? _authLocalDataSource;
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response?.statusCode == 401) {
+      final local = _authLocalDataSource;
+      if (local != null) {
+        unawaited(local.clearSession());
+      }
+      SessionExpiredNotifier.instance.notify();
+    }
     handler.next(err);
   }
 }

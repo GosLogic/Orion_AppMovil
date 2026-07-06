@@ -30,7 +30,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthCheckRequested event,
     Emitter<AuthState> emit,
   ) async {
-    emit(state.copyWith(status: AuthStatus.loading, clearError: true));
+    emit(state.copyWith(status: AuthStatus.checkingSession, clearError: true));
 
     final sessionResult = await _checkSessionUseCase();
     switch (sessionResult) {
@@ -88,13 +88,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
         );
       case Error(failure: final failure):
-        final message = failure is AuthFailure
-            ? 'Credenciales incorrectas. Verifica tu correo y contraseña.'
-            : failure.message;
         emit(
           AuthState(
             status: AuthStatus.error,
-            errorMessage: message,
+            errorMessage: failure.message,
           ),
         );
     }

@@ -17,6 +17,10 @@ class DriverSession extends Equatable {
 
   bool get isValid => !isExpired && jwt.isNotEmpty && tenantId.isNotEmpty;
 
+  bool expiresWithin(Duration window) {
+    return expiresAt.difference(DateTime.now()) <= window;
+  }
+
   @override
   List<Object?> get props => [driverId, tenantId, jwt, expiresAt];
 }

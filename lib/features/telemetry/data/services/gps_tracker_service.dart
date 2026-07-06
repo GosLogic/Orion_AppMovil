@@ -16,7 +16,7 @@ class GpsTrackerService {
 
   VoidCallback? onPositionSaved;
 
-  static const Duration captureInterval = Duration(seconds: 15);
+  static const Duration captureInterval = Duration(seconds: 5);
 
   Timer? _timer;
   int? _vehicleId;

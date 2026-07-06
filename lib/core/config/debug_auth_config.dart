@@ -31,4 +31,8 @@ class DebugAuthConfig {
       expiresAt: DateTime.now().add(const Duration(hours: 24)),
     );
   }
+
+  static bool isDemoSession(DriverSessionModel session) {
+    return session.jwt == 'debug-jwt-orion-driver';
+  }
 }

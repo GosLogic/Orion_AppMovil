@@ -3,6 +3,7 @@ import 'package:orion_app/features/auth/domain/entities/driver_session.dart';
 
 enum AuthStatus {
   initial,
+  checkingSession,
   loading,
   authenticated,
   unauthenticated,

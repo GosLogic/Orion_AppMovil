@@ -1,23 +1,27 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:orion_app/core/config/dev_api_config.dart';
 
 class ApiConstants {
   ApiConstants._();
 
-  /// URL del API Gateway. Prioridad: `ORION_API_BASE_URL` → Android emulador
-  /// (`10.0.2.2`) → localhost (Windows/desktop).
-  ///
-  /// En emulador Android, `localhost` / `127.0.0.1` se reemplazan por
-  /// `10.0.2.2` (alias del host desde el emulador).
+  /// URL del API Gateway. Prioridad: `ORION_API_BASE_URL` → Android físico
+  /// (IP LAN de la PC) → emulador (`10.0.2.2`) → localhost (desktop).
   static String get baseUrl {
     const fromEnv = String.fromEnvironment('ORION_API_BASE_URL');
-    final raw = fromEnv.isNotEmpty
-        ? fromEnv
-        : (!kIsWeb && Platform.isAndroid)
-            ? 'http://10.0.2.2:8080/v1'
-            : 'http://localhost:8080/v1';
-    return _resolveForPlatform(raw);
+    if (fromEnv.isNotEmpty) return _resolveForPlatform(fromEnv);
+
+    if (!kIsWeb && Platform.isAndroid) {
+      final host = DevApiConfig.useEmulator
+          ? '10.0.2.2'
+          : (DevApiConfig.useAdbReverse
+              ? '127.0.0.1'
+              : DevApiConfig.pcLanHost);
+      return 'http://$host:8080/v1';
+    }
+
+    return 'http://localhost:8080/v1';
   }
 
   static String _resolveForPlatform(String url) {
@@ -38,10 +42,15 @@ class ApiConstants {
   static String get notificationBaseUrl {
     const fromEnv = String.fromEnvironment('ORION_NOTIFICATION_BASE_URL');
     if (fromEnv.isNotEmpty) return _resolveForPlatform(fromEnv);
-    final host = (!kIsWeb && Platform.isAndroid)
-        ? 'http://10.0.2.2:8086/v1'
-        : 'http://localhost:8086/v1';
-    return _resolveForPlatform(host);
+    if (!kIsWeb && Platform.isAndroid) {
+      final host = DevApiConfig.useEmulator
+          ? '10.0.2.2'
+          : (DevApiConfig.useAdbReverse
+              ? '127.0.0.1'
+              : DevApiConfig.pcLanHost);
+      return 'http://$host:8086/v1';
+    }
+    return 'http://localhost:8086/v1';
   }
   static const String authorizationHeader = 'Authorization';
   static const String tenantIdHeader = 'X-Tenant-Id';

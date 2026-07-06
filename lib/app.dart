@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:orion_app/core/auth/session_expired_notifier.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_state.dart';
@@ -11,15 +14,36 @@ import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.da
 import 'package:orion_app/features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'package:orion_app/injection_container.dart';
 
-class OrionApp extends StatelessWidget {
+class OrionApp extends StatefulWidget {
   const OrionApp({super.key});
+
+  @override
+  State<OrionApp> createState() => _OrionAppState();
+}
+
+class _OrionAppState extends State<OrionApp> {
+  StreamSubscription<void>? _sessionExpiredSub;
+  AuthBloc? _authBloc;
+
+  @override
+  void dispose() {
+    _sessionExpiredSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider<AuthBloc>(
-          create: (_) => sl.get<AuthBloc>()..add(const AuthCheckRequested()),
+          create: (_) {
+            _authBloc = sl.get<AuthBloc>()..add(const AuthCheckRequested());
+            _sessionExpiredSub ??=
+                SessionExpiredNotifier.instance.stream.listen((_) {
+              _authBloc?.add(const AuthSessionExpired());
+            });
+            return _authBloc!;
+          },
         ),
         BlocProvider<DispatchBloc>(
           create: (_) => sl.get<DispatchBloc>(),
@@ -73,7 +97,7 @@ class OrionApp extends StatelessWidget {
             builder: (context, state) {
               return switch (state.status) {
                 AuthStatus.authenticated => const RouteSheetsListPage(),
-                AuthStatus.initial || AuthStatus.loading =>
+                AuthStatus.initial || AuthStatus.checkingSession =>
                   const _SplashScreen(),
                 _ => const LoginPage(),
               };

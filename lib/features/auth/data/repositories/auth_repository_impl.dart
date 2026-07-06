@@ -44,8 +44,37 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Result<void>> logout() async {
     try {
+      final session = await _localDataSource.getSession();
+      if (session != null && !DebugAuthConfig.isDemoSession(session)) {
+        try {
+          await _remoteDataSource.logoutRemote(session.jwt);
+        } on DioException {
+          // Best-effort: limpiar sesión local aunque falle el backend.
+        }
+      }
       await _localDataSource.clearSession();
       return const Success(null);
+    } catch (e) {
+      return Error(CacheFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<DriverSession>> refreshSession() async {
+    try {
+      final session = await _localDataSource.getSession();
+      if (session == null) {
+        return const Error(SessionExpiredFailure());
+      }
+      if (DebugAuthConfig.isDemoSession(session)) {
+        return Success(session.toEntity());
+      }
+
+      final refreshed = await _remoteDataSource.refresh(session.jwt);
+      await _localDataSource.saveSession(refreshed);
+      return Success(refreshed.toEntity());
+    } on DioException catch (e) {
+      return Error(AuthFailure(mapAuthLoginError(e)));
     } catch (e) {
       return Error(CacheFailure(e.toString()));
     }
@@ -56,10 +85,12 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final session = await _localDataSource.getSession();
       if (session == null) return const Success(null);
+
       if (session.isExpired) {
         await _localDataSource.clearSession();
         return const Error(SessionExpiredFailure());
       }
+
       return Success(session.toEntity());
     } catch (e) {
       return Error(CacheFailure(e.toString()));

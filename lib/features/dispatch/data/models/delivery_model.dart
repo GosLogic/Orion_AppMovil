@@ -13,6 +13,8 @@ class DeliveryModel extends Delivery {
     super.deliveredAt,
     super.synced = false,
     super.isCompleted = false,
+    super.latitude,
+    super.longitude,
   });
 
   factory DeliveryModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,8 @@ class DeliveryModel extends Delivery {
           : null,
       synced: json['synced'] == true || json['synced'] == 1,
       isCompleted: json['is_completed'] == true || json['is_completed'] == 1,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -54,6 +58,8 @@ class DeliveryModel extends Delivery {
       deliveredAt: delivery.deliveredAt,
       synced: delivery.synced,
       isCompleted: delivery.isCompleted,
+      latitude: delivery.latitude,
+      longitude: delivery.longitude,
     );
   }
 
@@ -75,6 +81,8 @@ class DeliveryModel extends Delivery {
         'delivered_at': deliveredAt?.toIso8601String(),
         'is_completed': isCompleted,
         'synced': synced,
+        'latitude': latitude,
+        'longitude': longitude,
       };
 
   /// Payload para POST /dispatch/deliveries (booleanos explícitos, synced=false).
@@ -89,6 +97,8 @@ class DeliveryModel extends Delivery {
         'notes': proof?.notes,
         'delivered_at': (deliveredAt ?? DateTime.now()).toIso8601String(),
         'is_completed': isCompleted,
+        'latitude': latitude,
+        'longitude': longitude,
         'synced': false,
       };
 
@@ -115,5 +125,7 @@ class DeliveryModel extends Delivery {
         deliveredAt: deliveredAt,
         synced: synced,
         isCompleted: isCompleted,
+        latitude: latitude,
+        longitude: longitude,
       );
 }
