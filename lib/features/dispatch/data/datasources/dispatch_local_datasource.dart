@@ -26,6 +26,8 @@ abstract class DispatchLocalDataSource {
   Future<void> saveTripStop(TripStopModel stop);
 
   Future<void> saveDelivery(DeliveryModel delivery);
+
+  Future<void> deleteDeliveriesForStop(String tripStopId);
 }
 
 class DispatchLocalDataSourceImpl implements DispatchLocalDataSource {
@@ -120,6 +122,16 @@ class DispatchLocalDataSourceImpl implements DispatchLocalDataSource {
       DatabaseConstants.deliveriesTable,
       delivery.toLocalMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  @override
+  Future<void> deleteDeliveriesForStop(String tripStopId) async {
+    final db = await _databaseHelper.database;
+    await db.delete(
+      DatabaseConstants.deliveriesTable,
+      where: 'trip_stop_id = ?',
+      whereArgs: [tripStopId],
     );
   }
 }

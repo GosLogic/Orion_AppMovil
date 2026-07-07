@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:orion_app/core/auth/session_expired_notifier.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/theme/orion_theme.dart';
+import 'package:orion_app/core/widgets/orion_logo.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_state.dart';
 import 'package:orion_app/features/auth/presentation/pages/login_page.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_bloc.dart';
-import 'package:orion_app/features/dispatch/presentation/pages/route_sheets_list_page.dart';
+import 'package:orion_app/features/home/presentation/pages/main_navigation_page.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_bloc.dart';
 import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.dart';
 import 'package:orion_app/features/notifications/presentation/bloc/notifications_bloc.dart';
@@ -71,13 +74,8 @@ class _OrionAppState extends State<OrionApp> {
                 content: Text(
                   state.errorMessage ??
                       'Tu sesión ha expirado. Inicia jornada nuevamente.',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
-                backgroundColor: const Color(0xFFE65100),
-                behavior: SnackBarBehavior.floating,
+                backgroundColor: OrionColors.warning,
                 margin: const EdgeInsets.all(16),
               ),
             );
@@ -85,18 +83,11 @@ class _OrionAppState extends State<OrionApp> {
         child: MaterialApp(
           title: 'Orion Driver',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF1A237E),
-              brightness: Brightness.light,
-            ),
-            useMaterial3: true,
-            scaffoldBackgroundColor: const Color(0xFFECEFF1),
-          ),
+          theme: OrionTheme.light,
           home: BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
               return switch (state.status) {
-                AuthStatus.authenticated => const RouteSheetsListPage(),
+                AuthStatus.authenticated => const MainNavigationPage(),
                 AuthStatus.initial || AuthStatus.checkingSession =>
                   const _SplashScreen(),
                 _ => const LoginPage(),
@@ -114,32 +105,42 @@ class _SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFFECEFF1),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.local_shipping_rounded,
-              size: 72,
-              color: Color(0xFF1A237E),
-            ),
-            SizedBox(height: 24),
-            CircularProgressIndicator(
-              color: Color(0xFF1A237E),
-              strokeWidth: 3,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Verificando sesión...',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF455A64),
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: OrionColors.primaryGradient,
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const OrionLogo(size: 120, showShadow: false),
+              const SizedBox(height: 28),
+              Text(
+                'Orion Driver',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                    ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Cargando tu sesión...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+              ),
+              const SizedBox(height: 40),
+              const SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

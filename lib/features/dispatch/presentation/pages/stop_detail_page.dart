@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/widgets/orion_decorations.dart';
+import 'package:orion_app/core/widgets/orion_list_ui.dart';
 import 'package:orion_app/features/dispatch/domain/entities/delivery.dart';
 import 'package:orion_app/features/dispatch/domain/entities/trip_stop.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_bloc.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_event.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_state.dart';
 import 'package:orion_app/features/dispatch/presentation/pages/proof_of_delivery_page.dart';
+import 'package:orion_app/features/dispatch/presentation/utils/waze_navigation_launcher.dart';
+import 'package:orion_app/features/dispatch/presentation/widgets/delivery_card.dart';
 import 'package:orion_app/features/dispatch/presentation/widgets/stop_status_badge.dart';
 
 class StopDetailPage extends StatelessWidget {
-  final TripStop tripStop;
-
   const StopDetailPage({super.key, required this.tripStop});
+
+  final TripStop tripStop;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFECEFF1),
-      appBar: AppBar(
-        title: Text('Parada ${tripStop.sequence}'),
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
-      ),
+    return OrionPageScaffold(
+      title: 'Parada ${tripStop.sequence}',
       body: BlocListener<DispatchBloc, DispatchState>(
         listenWhen: (previous, current) =>
             previous.successMessage != current.successMessage ||
@@ -32,12 +32,8 @@ class StopDetailPage extends StatelessWidget {
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(
-                    state.successMessage!,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  backgroundColor: const Color(0xFF2E7D32),
-                  behavior: SnackBarBehavior.floating,
+                  content: Text(state.successMessage!),
+                  backgroundColor: OrionColors.success,
                 ),
               );
           }
@@ -46,190 +42,180 @@ class StopDetailPage extends StatelessWidget {
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(
-                    state.errorMessage!,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  backgroundColor: const Color(0xFFC62828),
-                  behavior: SnackBarBehavior.floating,
+                  content: Text(state.errorMessage!),
+                  backgroundColor: OrionColors.error,
                 ),
               );
           }
         },
         child: BlocBuilder<DispatchBloc, DispatchState>(
-        builder: (context, state) {
-          final isSubmitting = state.status == DispatchStatus.submitting;
-          final jornadaActive = state.isJornadaActive;
-          final currentStop = state.tripStops
-                  .where((s) => s.id == tripStop.id)
-                  .firstOrNull ??
-              tripStop;
-          final deliveries = state.deliveries
-              .where((d) => d.tripStopId == tripStop.id)
-              .toList();
+          builder: (context, state) {
+            final isSubmitting = state.status == DispatchStatus.submitting;
+            final jornadaActive = state.isJornadaActive;
+            final currentStop = state.tripStops
+                    .where((s) => s.id == tripStop.id)
+                    .firstOrNull ??
+                tripStop;
+            final deliveries = state.deliveries
+                .where((d) => d.tripStopId == tripStop.id)
+                .toList();
 
-          return Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    children: [
+                      OrionSurfaceCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Text(
-                                    currentStop.locationName.isNotEmpty
-                                        ? currentStop.locationName
-                                        : 'Parada ${currentStop.sequence}',
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF263238),
+                                Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    gradient: OrionColors.primaryGradient,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${currentStop.sequence}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ),
                                 ),
-                                StopStatusBadge(status: currentStop.status),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        currentStop.displayName,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      StopStatusBadge(status: currentStop.status),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 16),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  color: Color(0xFF1A237E),
-                                  size: 28,
+                                Icon(
+                                  Icons.place_outlined,
+                                  color: OrionColors.primary.withValues(
+                                    alpha: 0.8,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     currentStop.address,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF455A64),
-                                    ),
+                                    style:
+                                        Theme.of(context).textTheme.bodyLarge,
                                   ),
                                 ),
                               ],
                             ),
-                            if (currentStop.status == TripStopStatus.pending &&
-                                jornadaActive) ...[
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF1565C0),
-                                    side: const BorderSide(
-                                      color: Color(0xFF1565C0),
-                                      width: 2,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  onPressed: isSubmitting
-                                      ? null
-                                      : () => context.read<DispatchBloc>().add(
-                                            MarkStopArrived(currentStop.id),
-                                          ),
-                                  icon: const Icon(Icons.place),
-                                  label: const Text(
-                                    'Marcar Llegada',
-                                    style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                            if (jornadaActive &&
+                                currentStop.status !=
+                                    TripStopStatus.completed &&
+                                currentStop.status !=
+                                    TripStopStatus.skipped) ...[
+                              const SizedBox(height: 18),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: OrionColors.accent,
+                                  minimumSize: const Size.fromHeight(52),
                                 ),
+                                onPressed: () =>
+                                    openWazeNavigation(context, currentStop),
+                                icon: const Icon(Icons.navigation_rounded),
+                                label: const Text('Abrir en Waze'),
+                              ),
+                            ],
+                            if (currentStop.status ==
+                                    TripStopStatus.pending &&
+                                jornadaActive) ...[
+                              const SizedBox(height: 10),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: OrionColors.primary,
+                                  side: BorderSide(
+                                    color: OrionColors.primary.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                  ),
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () => context
+                                        .read<DispatchBloc>()
+                                        .add(MarkStopArrived(currentStop.id)),
+                                icon: const Icon(Icons.place_rounded),
+                                label: const Text('Marcar llegada'),
                               ),
                             ],
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Entregas en esta parada',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF263238),
+                      const SizedBox(height: 20),
+                      OrionSectionHeader(
+                        icon: Icons.local_shipping_outlined,
+                        title: 'Entregas',
+                        subtitle: '${deliveries.length} en esta parada',
+                        count: deliveries.length,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (deliveries.isEmpty)
-                      const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Text(
-                            'Sin entregas pendientes',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      )
-                    else
-                      ...deliveries.map(
-                        (delivery) => Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            leading: Icon(
-                              delivery.isCompleted
-                                  ? Icons.check_circle
-                                  : Icons.inventory_2_outlined,
-                              color: delivery.isCompleted
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFF1A237E),
-                              size: 32,
-                            ),
-                            title: Text(
-                              delivery.customerName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
+                      if (deliveries.isEmpty)
+                        OrionSurfaceCard(
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.inbox_outlined,
+                                color: OrionColors.textMuted,
+                                size: 32,
                               ),
-                            ),
-                            subtitle: Text(delivery.packageDescription),
-                            trailing: delivery.isCompleted
-                                ? const Text(
-                                    'Entregado',
-                                    style: TextStyle(
-                                      color: Color(0xFF2E7D32),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  )
-                                : null,
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  'Sin entregas en esta parada',
+                                  style:
+                                      Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ),
+                            ],
                           ),
+                        )
+                      else
+                        ...deliveries.map(
+                          (d) => DeliveryCard(delivery: d),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              _ActionButtons(
-                tripStop: currentStop,
-                pendingDelivery: deliveries
-                    .where((d) => !d.isCompleted)
-                    .firstOrNull,
-                isSubmitting: isSubmitting,
-                jornadaActive: jornadaActive,
-              ),
-            ],
-          );
-        },
+                _ActionButtons(
+                  pendingDelivery:
+                      deliveries.where((d) => !d.isCompleted).firstOrNull,
+                  isSubmitting: isSubmitting,
+                  jornadaActive: jornadaActive,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -237,68 +223,35 @@ class StopDetailPage extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
-  final TripStop tripStop;
-  final Delivery? pendingDelivery;
-  final bool isSubmitting;
-  final bool jornadaActive;
-
   const _ActionButtons({
-    required this.tripStop,
     required this.pendingDelivery,
     required this.isSubmitting,
     required this.jornadaActive,
   });
 
+  final Delivery? pendingDelivery;
+  final bool isSubmitting;
+  final bool jornadaActive;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A237E),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 3,
-              ),
-              onPressed: isSubmitting || pendingDelivery == null || !jornadaActive
-                  ? null
-                  : () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ProofOfDeliveryPage(
-                            deliveryId: pendingDelivery!.id,
-                            customerName: pendingDelivery!.customerName,
-                            packageDescription:
-                                pendingDelivery!.packageDescription,
-                          ),
-                        ),
-                      );
-                    },
-              icon: const Icon(Icons.check_circle_outline, size: 28),
-              label: const Text(
-                'Registrar Entrega',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ),
-        ],
+    return OrionBottomActionBar(
+      child: FilledButton.icon(
+        onPressed: isSubmitting || pendingDelivery == null || !jornadaActive
+            ? null
+            : () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProofOfDeliveryPage(
+                      deliveryId: pendingDelivery!.id,
+                      customerName: pendingDelivery!.customerName,
+                      packageDescription: pendingDelivery!.packageDescription,
+                    ),
+                  ),
+                );
+              },
+        icon: const Icon(Icons.check_circle_outline_rounded),
+        label: const Text('Registrar entrega'),
       ),
     );
   }

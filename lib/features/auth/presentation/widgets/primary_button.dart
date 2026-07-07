@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
 
 class PrimaryButton extends StatelessWidget {
   final String label;
@@ -12,7 +13,7 @@ class PrimaryButton extends StatelessWidget {
     this.isLoading = false,
   });
 
-  static const Color _background = Color(0xFF1A237E);
+  static const Color _background = OrionColors.primary;
   static const Color _disabledBackground = Color(0xFF9FA8DA);
 
   @override

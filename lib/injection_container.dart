@@ -14,6 +14,9 @@ import 'package:orion_app/features/auth/domain/usecases/login_usecase.dart';
 import 'package:orion_app/features/auth/domain/usecases/logout_usecase.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:orion_app/features/dispatch/data/datasources/dispatch_local_datasource.dart';
+import 'package:orion_app/features/dispatch/data/services/geocoding_service.dart';
+import 'package:orion_app/features/dispatch/data/services/stop_destination_resolver.dart';
+import 'package:orion_app/features/dispatch/data/services/waze_navigation_service.dart';
 import 'package:orion_app/features/dispatch/data/datasources/dispatch_remote_datasource.dart';
 import 'package:orion_app/features/dispatch/data/repositories/dispatch_repository_impl.dart';
 import 'package:orion_app/features/dispatch/domain/repositories/dispatch_repository.dart';
@@ -141,6 +144,15 @@ Future<void> initDependencies() async {
       deviceLocationService: sl.get<DeviceLocationService>(),
     ),
   );
+  sl.registerSingleton<GeocodingService>(GeocodingService());
+  sl.registerSingleton<StopDestinationResolver>(
+    StopDestinationResolver(geocodingService: sl.get<GeocodingService>()),
+  );
+  sl.registerSingleton<WazeNavigationService>(
+    WazeNavigationService(
+      destinationResolver: sl.get<StopDestinationResolver>(),
+    ),
+  );
   sl.registerSingleton<LoadRouteSheetsUseCase>(
     LoadRouteSheetsUseCase(sl.get<DispatchRepository>()),
   );
@@ -202,7 +214,10 @@ Future<void> initDependencies() async {
     GpsTrackerService(savePositionUseCase: sl.get<SavePositionUseCase>()),
   );
   sl.registerSingleton<TelemetrySyncService>(
-    TelemetrySyncService(repository: sl.get<TelemetryRepository>()),
+    TelemetrySyncService(
+      repository: sl.get<TelemetryRepository>(),
+      syncInterval: TelemetrySyncService.defaultSyncInterval,
+    ),
   );
   sl.registerSingleton<TelemetryCoordinator>(
     TelemetryCoordinator(

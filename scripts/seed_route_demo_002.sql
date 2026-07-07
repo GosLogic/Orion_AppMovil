@@ -23,6 +23,27 @@ SET status = 'PENDING',
     departure_time = NULL
 WHERE route_sheet_id = (SELECT id FROM route_sheets WHERE external_id = 'route-demo-001');
 
+-- Coordenadas para paradas de route-demo-001 (navegación Waze)
+UPDATE trip_stops
+SET latitude = v.lat,
+    longitude = v.lng
+FROM route_sheets rs,
+     (VALUES
+        ('stop-001', -12.0464, -77.0428),
+        ('stop-002', -12.0847, -77.0335),
+        ('stop-003', -12.0755, -77.0850)
+     ) AS v(external_id, lat, lng)
+WHERE rs.external_id = 'route-demo-001'
+  AND trip_stops.route_sheet_id = rs.id
+  AND trip_stops.external_id = v.external_id;
+
+-- Por nombre (ej. Bodega Central) si no coincide external_id
+UPDATE trip_stops
+SET latitude = COALESCE(latitude, -12.0464),
+    longitude = COALESCE(longitude, -77.0428)
+WHERE location_name ILIKE '%Bodega Central%'
+  AND (latitude IS NULL OR longitude IS NULL);
+
 -- 2) Nueva hoja route-demo-002 (solo si no existe)
 INSERT INTO route_sheets (
     created_at, date, driver_external_id, external_id, status,

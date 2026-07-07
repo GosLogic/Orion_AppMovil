@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:orion_app/core/sync/sync_manager.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/widgets/orion_list_ui.dart';
 import 'package:orion_app/features/dispatch/domain/entities/route_sheet.dart';
 import 'package:orion_app/features/dispatch/domain/entities/trip_stop.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_bloc.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_event.dart';
 import 'package:orion_app/features/dispatch/presentation/bloc/dispatch_state.dart';
+import 'package:orion_app/features/dispatch/presentation/utils/waze_navigation_launcher.dart';
 import 'package:orion_app/features/dispatch/presentation/pages/stop_detail_page.dart';
+import 'package:orion_app/features/dispatch/presentation/utils/dispatch_stop_utils.dart';
 import 'package:orion_app/features/dispatch/presentation/widgets/stop_card_widget.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_bloc.dart';
 import 'package:orion_app/features/telemetry/presentation/bloc/telemetry_event.dart';
@@ -33,17 +37,16 @@ class _RouteHomePageState extends State<RouteHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFECEFF1),
+      backgroundColor: OrionColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Hoja de Ruta',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+        title: const Text('Hoja de Ruta'),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(gradient: OrionColors.primaryGradient),
         ),
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
-        actions: [
-          const _GpsStatusChip(),
-          const _SyncStatusIcon(),
+        actions: const [
+          _GpsStatusChip(),
+          _SyncStatusIcon(),
+          SizedBox(width: 8),
         ],
       ),
       body: MultiBlocListener(
@@ -77,44 +80,32 @@ class _RouteHomePageState extends State<RouteHomePage> {
           if (state.status == DispatchStatus.loading &&
               state.dailyRoute == null) {
             return const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1A237E)),
+              child: CircularProgressIndicator(color: OrionColors.primary),
             );
           }
 
           if (state.dailyRoute == null) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.route_outlined,
-                      size: 64,
-                      color: Color(0xFF455A64),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      state.infoMessage ??
+            return RefreshIndicator(
+              color: OrionColors.primary,
+              onRefresh: () async {
+                context
+                    .read<DispatchBloc>()
+                    .add(LoadRouteSheet(widget.routeSheetId));
+                await Future<void>.delayed(const Duration(milliseconds: 400));
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height * 0.55,
+                    child: OrionEmptyState(
+                      icon: Icons.route_outlined,
+                      title: state.infoMessage ??
                           'No tienes una hoja de ruta asignada.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF455A64),
-                      ),
+                      subtitle: 'Desliza hacia abajo para actualizar.',
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Desliza hacia abajo para actualizar.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF78909C),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           }
@@ -123,7 +114,7 @@ class _RouteHomePageState extends State<RouteHomePage> {
           final isSubmitting = state.status == DispatchStatus.submitting;
 
           return RefreshIndicator(
-            color: const Color(0xFF1A237E),
+            color: OrionColors.primary,
             onRefresh: () async {
               context
                   .read<DispatchBloc>()
@@ -147,16 +138,20 @@ class _RouteHomePageState extends State<RouteHomePage> {
                     onMaintenance: () => _openMaintenanceReport(context, route),
                   ),
                 ),
+                SliverToBoxAdapter(
+                  child: _NextStopNavigationBanner(
+                    stop: DispatchStopUtils.nextNavigableStop(state.tripStops),
+                    jornadaActive: state.isJornadaActive,
+                  ),
+                ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   sliver: SliverToBoxAdapter(
-                    child: Text(
-                      'Paradas (${state.tripStops.length})',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF263238),
-                      ),
+                    child: OrionSectionHeader(
+                      icon: Icons.location_on_outlined,
+                      title: 'Paradas',
+                      subtitle: 'Toca una parada · navegación con Waze',
+                      count: state.tripStops.length,
                     ),
                   ),
                 ),
@@ -171,6 +166,11 @@ class _RouteHomePageState extends State<RouteHomePage> {
                           isLocked: !state.isJornadaActive,
                           isLast: index == state.tripStops.length - 1,
                           onTap: () => _openStopDetail(context, stop),
+                          onNavigate: state.isJornadaActive &&
+                                  stop.status != TripStopStatus.completed &&
+                                  stop.status != TripStopStatus.skipped
+                              ? () => openWazeNavigation(context, stop)
+                              : null,
                         );
                       },
                       childCount: state.tripStops.length,
@@ -317,11 +317,12 @@ class _GpsStatusChip extends StatelessWidget {
         } else if (pending > 0) {
           tooltip = 'GPS activo · $pending pendientes de envío';
         } else if (state.lastSyncedAt != null) {
-          final mins =
-              DateTime.now().difference(state.lastSyncedAt!).inMinutes;
-          tooltip = mins < 1
-              ? 'GPS activo · enviado al servidor'
-              : 'GPS activo · última sync hace $mins min';
+          final diff = DateTime.now().difference(state.lastSyncedAt!);
+          if (diff.inSeconds < 60) {
+            tooltip = 'GPS activo · sync hace ${diff.inSeconds}s';
+          } else {
+            tooltip = 'GPS activo · sync hace ${diff.inMinutes} min';
+          }
         } else {
           tooltip = 'GPS activo · capturando (aún sin sync)';
         }
@@ -468,96 +469,124 @@ class _RouteHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Card(
-            elevation: 4,
-            color: const Color(0xFF1A237E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          Container(
+            decoration: BoxDecoration(
+              gradient: OrionColors.primaryGradient,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: OrionColors.primary.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Vehículo asignado',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.local_shipping_rounded,
-                        color: Colors.white,
-                        size: 36,
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
+                              'Vehículo asignado',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
                               plateLabel,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 28,
+                                fontSize: 26,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
+                                letterSpacing: 0.5,
                               ),
                             ),
                             if (route.vehicleModel.isNotEmpty)
                               Text(
                                 route.vehicleModel,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 14,
                                 ),
                               ),
                           ],
                         ),
                       ),
+                      _StatusPill(label: _statusLabel(route.status)),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '$stopsCount paradas · Estado: ${_statusLabel(route.status)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _HeaderStat(
+                        icon: Icons.pin_drop_outlined,
+                        label: '$stopsCount paradas',
+                      ),
+                      const SizedBox(width: 16),
+                      _HeaderStat(
+                        icon: route.isJornadaActive
+                            ? Icons.play_circle_outline
+                            : Icons.pause_circle_outline,
+                        label: route.isJornadaActive
+                            ? 'Jornada activa'
+                            : 'Jornada pendiente',
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (canStart) _JornadaButton(
-            label: 'INICIAR JORNADA',
-            color: const Color(0xFF00C853),
-            icon: Icons.play_arrow_rounded,
-            isLoading: isSubmitting,
-            onPressed: onStart,
-          ),
-          if (canEnd) _JornadaButton(
-            label: 'FINALIZAR JORNADA',
-            color: const Color(0xFFE65100),
-            icon: Icons.stop_rounded,
-            isLoading: isSubmitting,
-            onPressed: onEnd,
-          ),
+          const SizedBox(height: 14),
+          if (canStart)
+            _JornadaButton(
+              label: 'Iniciar jornada',
+              color: OrionColors.success,
+              icon: Icons.play_arrow_rounded,
+              isLoading: isSubmitting,
+              onPressed: onStart,
+            ),
+          if (canEnd)
+            _JornadaButton(
+              label: 'Finalizar jornada',
+              color: OrionColors.warning,
+              icon: Icons.stop_rounded,
+              isLoading: isSubmitting,
+              onPressed: onEnd,
+            ),
           if (route.isJornadaActive) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             SizedBox(
-              height: 52,
+              height: 50,
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF1A237E),
-                  side: const BorderSide(color: Color(0xFF1A237E), width: 2),
+                  foregroundColor: OrionColors.primary,
+                  side: BorderSide(
+                    color: OrionColors.primary.withValues(alpha: 0.4),
+                    width: 1.5,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -567,24 +596,34 @@ class _RouteHeader extends StatelessWidget {
                 label: const Text(
                   'Reportar mantenimiento',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ),
           ],
           if (!canStart && !canEnd)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Jornada completada',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2E7D32),
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: OrionColors.success.withValues(alpha: 0.9),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Jornada completada',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: OrionColors.success.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -599,6 +638,139 @@ class _RouteHeader extends StatelessWidget {
       RouteSheetStatus.inProgress => 'EN CURSO',
       RouteSheetStatus.completed => 'COMPLETADA',
     };
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderStat extends StatelessWidget {
+  const _HeaderStat({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 18),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NextStopNavigationBanner extends StatelessWidget {
+  const _NextStopNavigationBanner({
+    required this.stop,
+    required this.jornadaActive,
+  });
+
+  final TripStop? stop;
+  final bool jornadaActive;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!jornadaActive || stop == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Material(
+        color: OrionColors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: () => openWazeNavigation(context, stop!),
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: OrionColors.accent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.navigation_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Siguiente entrega · Parada ${stop!.sequence}',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: OrionColors.primary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        stop!.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        stop!.address,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: OrionColors.primary,
+                  size: 28,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -621,7 +793,7 @@ class _JornadaButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 68,
+      height: 58,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
@@ -630,26 +802,26 @@ class _JornadaButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 5,
-          shadowColor: color.withValues(alpha: 0.5),
+          elevation: 3,
+          shadowColor: color.withValues(alpha: 0.4),
         ),
         onPressed: isLoading ? null : onPressed,
         icon: isLoading
             ? const SizedBox(
-                width: 26,
-                height: 26,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
-                  strokeWidth: 3,
+                  strokeWidth: 2.5,
                   color: Colors.white,
                 ),
               )
-            : Icon(icon, size: 34),
+            : Icon(icon, size: 26),
         label: Text(
           isLoading ? 'Procesando...' : label,
           style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
           ),
         ),
       ),

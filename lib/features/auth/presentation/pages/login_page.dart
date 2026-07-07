@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/widgets/orion_decorations.dart';
+import 'package:orion_app/core/widgets/orion_logo.dart';
 import 'package:orion_app/features/auth/domain/entities/auth_credentials.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:orion_app/features/auth/presentation/bloc/auth_event.dart';
@@ -20,10 +23,6 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  static const Color _background = Color(0xFFECEFF1);
-  static const Color _titleColor = Color(0xFF1A237E);
-  static const Color _subtitleColor = Color(0xFF455A64);
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -41,207 +40,186 @@ class _LoginPageState extends State<LoginPage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
-    final credentials = AuthCredentials(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
-
-    context.read<AuthBloc>().add(AuthLoginRequested(credentials));
+    context.read<AuthBloc>().add(
+          AuthLoginRequested(
+            AuthCredentials(
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            ),
+          ),
+        );
   }
 
-  void _showErrorSnackBar(BuildContext context, String message) {
+  void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            message,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: const Color(0xFFC62828),
-          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+          backgroundColor: color,
           margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
           duration: const Duration(seconds: 4),
         ),
       );
   }
 
-  void _showSessionExpiredSnackBar(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Tu sesión ha expirado. Inicia jornada nuevamente.',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: const Color(0xFFE65100),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          duration: const Duration(seconds: 5),
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: _background,
-      body: SafeArea(
-        child: BlocConsumer<AuthBloc, AuthState>(
-          listenWhen: (previous, current) =>
-              previous.status != current.status ||
-              previous.errorMessage != current.errorMessage,
-          listener: (context, state) {
-            if (state.status == AuthStatus.error &&
-                state.errorMessage != null) {
-              _showErrorSnackBar(context, state.errorMessage!);
-              return;
-            }
+      body: OrionHeroBackground(
+        child: SafeArea(
+          child: BlocConsumer<AuthBloc, AuthState>(
+            listenWhen: (previous, current) =>
+                previous.status != current.status ||
+                previous.errorMessage != current.errorMessage,
+            listener: (context, state) {
+              if (state.status == AuthStatus.error &&
+                  state.errorMessage != null) {
+                _showSnackBar(context, state.errorMessage!, OrionColors.error);
+              } else if (state.status == AuthStatus.unauthenticated &&
+                  state.isSessionExpired) {
+                _showSnackBar(
+                  context,
+                  'Tu sesión ha expirado. Inicia jornada nuevamente.',
+                  OrionColors.warning,
+                );
+              }
+            },
+            builder: (context, state) {
+              final isLoading = state.status == AuthStatus.loading;
 
-            if (state.status == AuthStatus.unauthenticated &&
-                state.isSessionExpired) {
-              _showSessionExpiredSnackBar(context);
-            }
-          },
-          builder: (context, state) {
-            final isLoading = state.status == AuthStatus.loading;
-
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 24,
-                ),
-                child: Form(
-                  key: _formKey,
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 20,
+                  ),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _LogoPlaceholder(),
-                      const SizedBox(height: 28),
-                      const Text(
-                        'Orion Driver',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
-                          color: _titleColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Inicia tu jornada de ruta',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w500,
-                          color: _subtitleColor,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      CustomTextField(
-                        controller: _emailController,
-                        label: 'Correo electrónico',
-                        hint: 'conductor@empresa.com',
-                        prefixIcon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        enabled: !isLoading,
-                        textInputAction: TextInputAction.next,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Ingresa tu correo electrónico';
-                          }
-                          if (!_isValidEmail(value.trim())) {
-                            return 'Formato de correo inválido';
-                          }
-                          return null;
-                        },
-                      ),
+                      const SizedBox(height: 12),
+                      const OrionLogo(size: 108),
                       const SizedBox(height: 20),
-                      CustomTextField(
-                        controller: _passwordController,
-                        label: 'Contraseña',
-                        hint: '••••••••',
-                        prefixIcon: Icons.lock_outline,
-                        obscureText: _obscurePassword,
-                        enabled: !isLoading,
-                        textInputAction: TextInputAction.done,
-                        onEditingComplete: _submit,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                            color: _titleColor,
-                            size: 26,
-                          ),
-                          onPressed: isLoading
-                              ? null
-                              : () => setState(
-                                    () => _obscurePassword = !_obscurePassword,
-                                  ),
+                      Text(
+                        'Orion Driver',
+                        style: theme.textTheme.headlineLarge?.copyWith(
+                          color: OrionColors.primary,
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa tu contraseña';
-                          }
-                          if (value.length < 6) {
-                            return 'Mínimo 6 caracteres';
-                          }
-                          return null;
-                        },
                       ),
-                      const SizedBox(height: 36),
-                      PrimaryButton(
-                        label: 'Iniciar Jornada',
-                        isLoading: isLoading,
-                        onPressed: _submit,
+                      const SizedBox(height: 6),
+                      Text(
+                        'Tu jornada, bajo control',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: OrionColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      OrionSurfaceCard(
+                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'Iniciar sesión',
+                                style: theme.textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ingresa tus credenciales de conductor',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 24),
+                              CustomTextField(
+                                controller: _emailController,
+                                label: 'Correo electrónico',
+                                hint: 'conductor@empresa.com',
+                                prefixIcon: Icons.email_outlined,
+                                keyboardType: TextInputType.emailAddress,
+                                enabled: !isLoading,
+                                textInputAction: TextInputAction.next,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Ingresa tu correo electrónico';
+                                  }
+                                  if (!_isValidEmail(value.trim())) {
+                                    return 'Formato de correo inválido';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 18),
+                              CustomTextField(
+                                controller: _passwordController,
+                                label: 'Contraseña',
+                                hint: '••••••••',
+                                prefixIcon: Icons.lock_outline_rounded,
+                                obscureText: _obscurePassword,
+                                enabled: !isLoading,
+                                textInputAction: TextInputAction.done,
+                                onEditingComplete: _submit,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    color: OrionColors.primary,
+                                  ),
+                                  onPressed: isLoading
+                                      ? null
+                                      : () => setState(
+                                            () => _obscurePassword =
+                                                !_obscurePassword,
+                                          ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Ingresa tu contraseña';
+                                  }
+                                  if (value.length < 6) {
+                                    return 'Mínimo 6 caracteres';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 28),
+                              PrimaryButton(
+                                label: 'Iniciar Jornada',
+                                isLoading: isLoading,
+                                onPressed: _submit,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.shield_outlined,
+                            size: 16,
+                            color: OrionColors.textMuted.withValues(alpha: 0.8),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Conexión segura vía Orion Gateway',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 12,
+                              color: OrionColors.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _LogoPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 120,
-      width: 120,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A237E),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1A237E).withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+              );
+            },
           ),
-        ],
-      ),
-      child: const Icon(
-        Icons.local_shipping_rounded,
-        size: 64,
-        color: Colors.white,
+        ),
       ),
     );
   }

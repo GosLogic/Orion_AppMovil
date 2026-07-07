@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/widgets/orion_list_ui.dart';
 import 'package:orion_app/features/incidents/domain/entities/maintenance_request.dart';
 import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.dart';
 import 'package:orion_app/features/incidents/presentation/bloc/incidents_event.dart';
 import 'package:orion_app/features/incidents/presentation/bloc/incidents_state.dart';
 
 class MaintenanceHistoryPage extends StatefulWidget {
-  const MaintenanceHistoryPage({super.key});
+  const MaintenanceHistoryPage({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<MaintenanceHistoryPage> createState() => _MaintenanceHistoryPageState();
@@ -21,6 +25,41 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final body = BlocBuilder<IncidentsBloc, IncidentsState>(
+      builder: (context, state) {
+        if (state.isLoading && state.maintenanceHistory.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state.maintenanceHistory.isEmpty) {
+          return const OrionEmptyState(
+            icon: Icons.build_circle_outlined,
+            title: 'Sin solicitudes de mantenimiento',
+            subtitle: 'Reporta una falla desde Incidentes o una hoja en curso',
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemCount: state.maintenanceHistory.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return OrionSectionHeader(
+                icon: Icons.build_outlined,
+                title: 'Historial',
+                subtitle: '${state.maintenanceHistory.length} solicitud(es)',
+                count: state.maintenanceHistory.length,
+              );
+            }
+            final item = state.maintenanceHistory[index - 1];
+            return _MaintenanceCard(request: item);
+          },
+        );
+      },
+    );
+
+    if (widget.embedded) return body;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historial mantenimiento'),
@@ -35,28 +74,7 @@ class _MaintenanceHistoryPageState extends State<MaintenanceHistoryPage> {
           ),
         ],
       ),
-      body: BlocBuilder<IncidentsBloc, IncidentsState>(
-        builder: (context, state) {
-          if (state.isLoading && state.maintenanceHistory.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.maintenanceHistory.isEmpty) {
-            return const Center(
-              child: Text('No hay solicitudes registradas'),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: state.maintenanceHistory.length,
-            itemBuilder: (context, index) {
-              final item = state.maintenanceHistory[index];
-              return _MaintenanceCard(request: item);
-            },
-          );
-        },
-      ),
+      body: body,
     );
   }
 }
@@ -72,8 +90,19 @@ class _MaintenanceCard extends StatelessWidget {
     final syncColor =
         request.synced ? const Color(0xFF2E7D32) : const Color(0xFFE65100);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: OrionColors.primary.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -84,49 +113,50 @@ class _MaintenanceCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     request.id,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 13,
+                      color: OrionColors.textSecondary,
                     ),
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: syncColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                OrionStatusChip(label: syncLabel, color: syncColor),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              request.description,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded,
+                    size: 16, color: OrionColors.warning),
+                const SizedBox(width: 4),
+                Flexible(
                   child: Text(
-                    syncLabel,
-                    style: TextStyle(
-                      color: syncColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
+                    '${request.severityLabel} · ${request.vehicleId}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${request.severityLabel} · ${request.vehicleId}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF455A64),
-              ),
-            ),
             if (request.serverStatus != null) ...[
               const SizedBox(height: 4),
-              Text('Estado servidor: ${request.serverStatus}'),
+              Text(
+                'Estado: ${request.serverStatus}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize: 12,
+                    ),
+              ),
             ],
-            const SizedBox(height: 8),
-            Text(request.description),
-            const SizedBox(height: 6),
-            Text(
-              'Reportado: ${request.reportedAt.toLocal()}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF78909C)),
-            ),
           ],
         ),
       ),

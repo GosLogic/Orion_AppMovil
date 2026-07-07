@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
+import 'package:orion_app/core/widgets/orion_list_ui.dart';
 import 'package:orion_app/features/incidents/domain/entities/maintenance_request.dart';
 import 'package:orion_app/features/incidents/domain/entities/route_incident.dart';
 import 'package:orion_app/features/incidents/presentation/bloc/incidents_bloc.dart';
@@ -9,11 +11,13 @@ import 'package:orion_app/features/incidents/presentation/bloc/incidents_state.d
 class ReportIncidentPage extends StatefulWidget {
   final String? stopId;
   final String vehicleId;
+  final bool embedded;
 
   const ReportIncidentPage({
     super.key,
     this.stopId,
     this.vehicleId = 'vehicle-001',
+    this.embedded = false,
   });
 
   @override
@@ -92,34 +96,24 @@ class _ReportIncidentPageState extends State<ReportIncidentPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFECEFF1),
-      appBar: AppBar(
-        title: const Text(
-          'Reportar Incidente',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        backgroundColor: const Color(0xFF1A237E),
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 4,
-          labelStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: const [
-            Tab(text: 'Problema en Ruta'),
-            Tab(text: 'Falla Mecánica'),
-          ],
-        ),
+    final tabBar = TabBar(
+      controller: _tabController,
+      indicatorColor: OrionColors.primary,
+      indicatorWeight: 3,
+      labelColor: OrionColors.primary,
+      unselectedLabelColor: OrionColors.textMuted,
+      dividerColor: Colors.transparent,
+      labelStyle: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w800,
       ),
-      body: BlocConsumer<IncidentsBloc, IncidentsState>(
+      tabs: const [
+        Tab(text: 'Problema en ruta'),
+        Tab(text: 'Falla mecánica'),
+      ],
+    );
+
+    final body = BlocConsumer<IncidentsBloc, IncidentsState>(
         listener: (context, state) {
           if (state.status == IncidentsStatus.success &&
               state.message != null) {
@@ -128,7 +122,7 @@ class _ReportIncidentPageState extends State<ReportIncidentPage>
               ..showSnackBar(
                 SnackBar(
                   content: Text(state.message!),
-                  backgroundColor: const Color(0xFF2E7D32),
+                  backgroundColor: OrionColors.success,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -147,7 +141,7 @@ class _ReportIncidentPageState extends State<ReportIncidentPage>
               ..showSnackBar(
                 SnackBar(
                   content: Text(state.errorMessage!),
-                  backgroundColor: const Color(0xFFC62828),
+                  backgroundColor: OrionColors.error,
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -181,7 +175,60 @@ class _ReportIncidentPageState extends State<ReportIncidentPage>
             ],
           );
         },
+    );
+
+    if (widget.embedded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const OrionSectionHeader(
+            icon: Icons.report_problem_outlined,
+            title: 'Reportar incidente',
+            subtitle: 'Problemas en ruta o fallas del vehículo',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Material(
+              color: Colors.white,
+              elevation: 0,
+              borderRadius: BorderRadius.circular(16),
+              child: tabBar,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(child: body),
+        ],
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFECEFF1),
+      appBar: AppBar(
+        title: const Text(
+          'Reportar Incidente',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          indicatorWeight: 4,
+          labelStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: const [
+            Tab(text: 'Problema en Ruta'),
+            Tab(text: 'Falla Mecánica'),
+          ],
+        ),
       ),
+      body: body,
     );
   }
 }

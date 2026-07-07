@@ -42,10 +42,13 @@ class TelemetrySyncState {
 
 /// Job periódico que envía posiciones GPS pendientes al backend.
 class TelemetrySyncService {
+  /// Intervalo de envío al servidor (mapa en vivo ~20 s).
+  static const Duration defaultSyncInterval = Duration(seconds: 20);
+
   TelemetrySyncService({
     required TelemetryRepository repository,
     Connectivity? connectivity,
-    Duration syncInterval = const Duration(minutes: 1),
+    Duration syncInterval = defaultSyncInterval,
     Duration baseBackoff = const Duration(seconds: 2),
     int maxBackoffAttempts = 3,
   })  : _repository = repository,

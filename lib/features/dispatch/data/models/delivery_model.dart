@@ -20,10 +20,11 @@ class DeliveryModel extends Delivery {
   factory DeliveryModel.fromJson(Map<String, dynamic> json) {
     final proofType = json['proof_type'] as String?;
     ProofOfDelivery? proof;
-    if (proofType != null) {
+    if (proofType != null && proofType.isNotEmpty) {
+      final normalized = proofType.toLowerCase();
       proof = ProofOfDelivery(
         type: ProofType.values.firstWhere(
-          (t) => t.name == proofType,
+          (t) => t.name == normalized,
           orElse: () => ProofType.photo,
         ),
         photoPath: json['photo_path'] as String?,
@@ -31,6 +32,11 @@ class DeliveryModel extends Delivery {
         notes: json['notes'] as String?,
       );
     }
+
+    final status = (json['status'] as String?)?.toUpperCase();
+    final isCompleted = json['is_completed'] == true ||
+        json['is_completed'] == 1 ||
+        status == 'DELIVERED';
 
     return DeliveryModel(
       id: json['id'] as String,
@@ -42,7 +48,7 @@ class DeliveryModel extends Delivery {
           ? DateTime.parse(json['delivered_at'] as String)
           : null,
       synced: json['synced'] == true || json['synced'] == 1,
-      isCompleted: json['is_completed'] == true || json['is_completed'] == 1,
+      isCompleted: isCompleted,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
     );

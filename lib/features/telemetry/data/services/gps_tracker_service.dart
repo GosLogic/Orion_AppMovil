@@ -16,6 +16,10 @@ class GpsTrackerService {
 
   VoidCallback? onPositionSaved;
 
+  /// Última posición capturada (para UI en vivo).
+  final ValueNotifier<VehiclePosition?> lastPosition =
+      ValueNotifier<VehiclePosition?>(null);
+
   static const Duration captureInterval = Duration(seconds: 5);
 
   Timer? _timer;
@@ -51,6 +55,7 @@ class GpsTrackerService {
     _timer = null;
     _vehicleId = null;
     _routeSheetId = null;
+    lastPosition.value = null;
   }
 
   Future<void> _ensureLocationPermissions() async {
@@ -134,6 +139,7 @@ class GpsTrackerService {
       );
     }
 
+    lastPosition.value = vehiclePosition;
     onPositionSaved?.call();
   }
 

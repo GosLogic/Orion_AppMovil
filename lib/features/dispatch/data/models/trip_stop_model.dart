@@ -9,6 +9,8 @@ class TripStopModel extends TripStop {
     required super.sequence,
     required super.address,
     super.locationName = '',
+    super.latitude,
+    super.longitude,
     super.estimatedArrival,
     required super.status,
   });
@@ -20,6 +22,8 @@ class TripStopModel extends TripStop {
       sequence: json['sequence'] as int? ?? json['stop_order'] as int? ?? 0,
       address: json['address'] as String,
       locationName: json['location_name'] as String? ?? '',
+      latitude: _parseCoord(json['latitude'] ?? json['lat']),
+      longitude: _parseCoord(json['longitude'] ?? json['lng']),
       estimatedArrival: json['estimated_arrival'] != null
           ? DateTime.parse(json['estimated_arrival'] as String)
           : null,
@@ -34,6 +38,8 @@ class TripStopModel extends TripStop {
       sequence: stop.sequence,
       address: stop.address,
       locationName: stop.locationName,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
       estimatedArrival: stop.estimatedArrival,
       status: stop.status,
     );
@@ -55,6 +61,13 @@ class TripStopModel extends TripStop {
     };
   }
 
+  static double? _parseCoord(Object? value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'route_sheet_id': routeSheetId,
@@ -62,6 +75,8 @@ class TripStopModel extends TripStop {
         'stop_order': sequence,
         'address': address,
         'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
         'estimated_arrival': estimatedArrival?.toIso8601String(),
         'status': status.name.toUpperCase(),
       };
@@ -83,6 +98,8 @@ class TripStopModel extends TripStop {
         sequence: sequence,
         address: address,
         locationName: locationName,
+        latitude: latitude,
+        longitude: longitude,
         estimatedArrival: estimatedArrival,
         status: status,
       );

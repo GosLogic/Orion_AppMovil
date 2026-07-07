@@ -10,6 +10,7 @@ import 'package:orion_app/features/dispatch/data/datasources/dispatch_remote_dat
 import 'package:orion_app/features/dispatch/data/models/delivery_model.dart';
 import 'package:orion_app/features/dispatch/data/models/route_sheet_model.dart';
 import 'package:orion_app/features/dispatch/data/models/trip_stop_model.dart';
+import 'package:orion_app/features/dispatch/data/models/trip_stop_remote_bundle.dart';
 import 'package:orion_app/features/dispatch/data/utils/dispatch_error_mapper.dart';
 import 'package:orion_app/features/dispatch/domain/entities/delivery.dart';
 import 'package:orion_app/features/dispatch/domain/entities/route_sheet.dart';
@@ -74,22 +75,34 @@ class DispatchRepositoryImpl implements DispatchRepository {
     await _localDataSource.clearRouteAndStops();
     await _localDataSource.saveRouteSheet(sheet);
 
-    List<TripStopModel> stops;
+    List<TripStopRemoteBundle> bundles;
     try {
-      stops = await _remoteDataSource.fetchTripStops(sheet.id);
+      bundles = await _remoteDataSource.fetchTripStops(sheet.id);
     } on DioException catch (e) {
       if (kDebugMode) {
         debugPrint('[Dispatch] Paradas no cargadas: ${mapDispatchError(e)}');
       }
-      stops = const [];
+      bundles = const [];
     }
 
-    for (final stop in stops) {
-      await _localDataSource.saveTripStop(stop);
-      final existing = await _localDataSource.getDeliveries(stop.id);
-      if (existing.isEmpty) {
-        await _seedDefaultDelivery(stop);
+    for (final bundle in bundles) {
+      await _localDataSource.saveTripStop(bundle.stop);
+      await _syncDeliveriesForStop(bundle);
+    }
+  }
+
+  Future<void> _syncDeliveriesForStop(TripStopRemoteBundle bundle) async {
+    if (bundle.deliveriesFromApi) {
+      await _localDataSource.deleteDeliveriesForStop(bundle.stop.id);
+      for (final delivery in bundle.deliveries) {
+        await _localDataSource.saveDelivery(delivery);
       }
+      return;
+    }
+
+    final existing = await _localDataSource.getDeliveries(bundle.stop.id);
+    if (existing.isEmpty) {
+      await _seedDefaultDelivery(bundle.stop);
     }
   }
 
@@ -146,7 +159,7 @@ class DispatchRepositoryImpl implements DispatchRepository {
     return todaySheets.isNotEmpty ? todaySheets.first : sheets.first;
   }
 
-  /// Sin GET /deliveries en backend; IDs alineados al seeder (del-stop-001-1, …).
+  /// Fallback si el backend aún no envía `deliveries[]` en trip-stops (P1-2).
   Future<void> _seedDefaultDelivery(TripStopModel stop) async {
     await _localDataSource.saveDelivery(
       DeliveryModel(

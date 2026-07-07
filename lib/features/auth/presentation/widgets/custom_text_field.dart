@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:orion_app/core/theme/orion_colors.dart';
 
 class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
@@ -31,11 +32,11 @@ class CustomTextField extends StatelessWidget {
     this.onEditingComplete,
   });
 
-  static const Color _fieldFill = Color(0xFFF5F7FA);
-  static const Color _borderColor = Color(0xFFB0BEC5);
-  static const Color _focusedBorder = Color(0xFF1A237E);
-  static const Color _labelColor = Color(0xFF263238);
-  static const Color _errorColor = Color(0xFFC62828);
+  static const Color _fieldFill = Color(0xFFFAFBFC);
+  static const Color _borderColor = Color(0xFFE0E4E8);
+  static const Color _focusedBorder = OrionColors.primary;
+  static const Color _labelColor = OrionColors.textPrimary;
+  static const Color _errorColor = OrionColors.error;
 
   @override
   Widget build(BuildContext context) {

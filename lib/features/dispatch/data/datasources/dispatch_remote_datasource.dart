@@ -4,12 +4,13 @@ import 'package:orion_app/core/network/api_client.dart';
 import 'package:orion_app/features/dispatch/data/models/delivery_model.dart';
 import 'package:orion_app/features/dispatch/data/models/route_sheet_model.dart';
 import 'package:orion_app/features/dispatch/data/models/trip_stop_model.dart';
+import 'package:orion_app/features/dispatch/data/models/trip_stop_remote_bundle.dart';
 import 'package:orion_app/features/dispatch/data/utils/dispatch_integration_log.dart';
 
 abstract class DispatchRemoteDataSource {
   Future<List<RouteSheetModel>> fetchRouteSheets();
 
-  Future<List<TripStopModel>> fetchTripStops(String routeSheetId);
+  Future<List<TripStopRemoteBundle>> fetchTripStops(String routeSheetId);
 
   Future<void> submitDelivery(DeliveryModel delivery);
 }
@@ -43,7 +44,7 @@ class DispatchRemoteDataSourceImpl implements DispatchRemoteDataSource {
   }
 
   @override
-  Future<List<TripStopModel>> fetchTripStops(String routeSheetId) async {
+  Future<List<TripStopRemoteBundle>> fetchTripStops(String routeSheetId) async {
     const path = ApiConstants.tripStops;
     DispatchIntegrationLog.request(
       method: 'GET',
@@ -60,10 +61,31 @@ class DispatchRemoteDataSourceImpl implements DispatchRemoteDataSource {
       final data = response.data;
       if (data is! List) return [];
 
-      return data
-          .whereType<Map<String, dynamic>>()
-          .map(TripStopModel.fromJson)
-          .toList();
+      return data.whereType<Map<String, dynamic>>().map((json) {
+        final stop = TripStopModel.fromJson(json);
+        final hasDeliveriesKey = json.containsKey('deliveries');
+        final rawDeliveries = json['deliveries'];
+        final deliveries = <DeliveryModel>[];
+
+        if (rawDeliveries is List) {
+          for (final item in rawDeliveries) {
+            if (item is Map<String, dynamic>) {
+              deliveries.add(
+                DeliveryModel.fromJson({
+                  ...item,
+                  'trip_stop_id': item['trip_stop_id'] ?? stop.id,
+                }),
+              );
+            }
+          }
+        }
+
+        return TripStopRemoteBundle(
+          stop: stop,
+          deliveries: deliveries,
+          deliveriesFromApi: hasDeliveriesKey,
+        );
+      }).toList();
     } on DioException catch (e) {
       DispatchIntegrationLog.error(e);
       rethrow;
