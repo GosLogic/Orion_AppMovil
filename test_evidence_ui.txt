@@ -1,0 +1,6 @@
+00:00 +0: loading C:/Users/user/Desktop/funadmentos de arquitectura de software/proyecto fundamentos/Orion_AppMovil/test/features/ui/asset_registration_test.dart
+00:00 +0: C:/Users/user/Desktop/funadmentos de arquitectura de software/proyecto fundamentos/Orion_AppMovil/test/features/ui/asset_registration_test.dart: validate asset registration form behavior
+00:00 +1: C:/Users/user/Desktop/funadmentos de arquitectura de software/proyecto fundamentos/Orion_AppMovil/test/features/ui/asset_registration_test.dart: validate asset registration form behavior
+00:01 +2: C:/Users/user/Desktop/funadmentos de arquitectura de software/proyecto fundamentos/Orion_AppMovil/test/features/ui/route_history_test.dart: validate route history filters and visualization
+00:01 +3: C:/Users/user/Desktop/funadmentos de arquitectura de software/proyecto fundamentos/Orion_AppMovil/test/features/ui/route_history_test.dart: validate route history filters and visualization
+00:02 +4: All tests passed!
